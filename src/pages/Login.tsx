@@ -32,7 +32,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row" style={{ backgroundImage: `url('/login-bg.png')`, backgroundSize: "cover", backgroundPosition: "center" }}>
+    <div className="h-screen overflow-hidden flex flex-col lg:flex-row" style={{ backgroundImage: `url('/login-bg.png')`, backgroundSize: "cover", backgroundPosition: "center" }}>
 
       {/* Left side — transparent overlay on image */}
       <div className="hidden lg:flex lg:w-1/2" />
@@ -44,7 +44,7 @@ const Login = () => {
         transition={{ delay: 0.2 }}
         className="lg:w-1/2 w-full flex items-center justify-center px-6 py-12"
       >
-        <div className="rounded-3xl p-8 shadow-xl w-full max-w-md" style={{ background: "rgba(245,240,232,0.92)", backdropFilter: "blur(8px)" }}>
+        <div className="rounded-3xl p-8 shadow-xl w-full max-w-md overflow-hidden" style={{ background: "rgba(245,240,232,0.92)", backdropFilter: "blur(8px)" }}>
 
           {mode !== "main" && (
             <button onClick={() => setMode("main")} className="flex items-center gap-1 text-sm text-muted-foreground mb-4 hover:text-foreground">
