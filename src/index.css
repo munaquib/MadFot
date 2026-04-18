@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 38 40% 85%;
+    --foreground: 150 45% 12%;
+
+    --card: 38 35% 88%;
+    --card-foreground: 150 45% 12%;
+
+    --popover: 38 35% 88%;
+    --popover-foreground: 150 45% 12%;
+
+    --primary: 153 55% 15%;
+    --primary-foreground: 43 56% 53%;
+
+    --secondary: 43 56% 53%;
+    --secondary-foreground: 153 55% 15%;
+
+    --muted: 38 30% 80%;
+    --muted-foreground: 150 10% 40%;
+
+    --accent: 43 56% 53%;
+    --accent-foreground: 153 55% 15%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 38 28% 75%;
+    --input: 38 30% 80%;
+    --ring: 153 55% 15%;
+
+    --radius: 0.875rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(153, 55%, 15%), hsl(153, 45%, 22%));
+    --gradient-hero: linear-gradient(135deg, hsl(43, 56%, 53%), hsl(43, 50%, 45%));
+    --gradient-bottom-nav: linear-gradient(180deg, hsl(38, 35%, 88%) 0%, hsl(38, 30%, 84%) 100%);
+    --gradient-card-shine: linear-gradient(135deg, hsl(43, 56%, 53%), hsl(43, 45%, 42%));
+    --gradient-bg: linear-gradient(180deg, hsl(38, 40%, 85%) 0%, hsl(37, 35%, 83%) 30%, hsl(38, 33%, 84%) 60%, hsl(39, 30%, 85%) 100%);
+    --gradient-page: linear-gradient(135deg, hsl(38, 40%, 86%) 0%, hsl(37, 35%, 84%) 50%, hsl(39, 33%, 85%) 100%);
+
+    --sidebar-background: 153 55% 15%;
+    --sidebar-foreground: 43 56% 53%;
+    --sidebar-primary: 43 56% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 153 45% 20%;
+    --sidebar-accent-foreground: 43 56% 53%;
+    --sidebar-border: 153 40% 20%;
+    --sidebar-ring: 43 56% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply text-foreground;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--gradient-bg);
+    min-height: 100vh;
+    letter-spacing: 0.01em;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  html {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  .gradient-card-shine {
+    background: var(--gradient-card-shine);
+  }
+  .gradient-page {
+    background: var(--gradient-page);
+    box-shadow: inset 0 2px 30px hsl(43 50% 30% / 0.08), inset 0 0 60px hsl(38 40% 50% / 0.05);
+  }
+  .text-gradient {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .shadow-card {
+    box-shadow: 0 4px 20px -4px hsl(43 50% 30% / 0.18), 0 2px 8px hsl(150 30% 20% / 0.1), 0 1px 3px hsl(43 40% 40% / 0.12);
+  }
+  .shadow-nav {
+    box-shadow: 0 -4px 20px -4px hsl(43 50% 30% / 0.15), 0 -1px 6px hsl(150 30% 20% / 0.08);
+  }
+  .shadow-luxury {
+    box-shadow: 0 10px 40px -8px hsl(43 50% 30% / 0.25), 0 4px 16px hsl(150 30% 20% / 0.12), 0 2px 6px hsl(43 56% 53% / 0.1);
+  }
+  .shadow-section {
+    box-shadow: 0 2px 16px -2px hsl(43 50% 30% / 0.14), 0 1px 4px hsl(150 30% 20% / 0.06);
+  }
+  .glass-card {
+    background: hsl(39 35% 93% / 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px -4px hsl(43 50% 30% / 0.15), 0 1px 4px hsl(43 40% 40% / 0.1);
+  }
+  .glass-nav {
+    background: hsl(40 30% 97% / 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .font-serif-display {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+/* Marquee animation */
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marquee-scroll 30s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Responsive & Cross-device fixes ──────────────────── */
+@media (max-width: 360px) {
+  .text-xl { font-size: 1.1rem; }
+  .text-2xl { font-size: 1.3rem; }
+}
+
+/* iOS Safari fixes */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen { min-height: -webkit-fill-available; }
+  body { min-height: -webkit-fill-available; }
+}
+
+/* Tablet optimizations */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .max-w-5xl { max-width: 100%; }
+  .lg\:px-6 { padding-left: 1rem; padding-right: 1rem; }
+}
+
+/* Touch-friendly tap targets */
+button, a, [role="button"] {
+  min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Smooth scrolling */
+html { scroll-behavior: smooth; }
+
+/* Hide scrollbar on mobile category pills */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* RTL support */
+[dir="rtl"] .font-serif { letter-spacing: 0; }
+[dir="rtl"] .marquee-track { animation-direction: reverse; }
