@@ -32,7 +32,7 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col lg:flex-row" style={{ backgroundImage: `url('/login-bg.png')`, backgroundSize: "cover", backgroundPosition: "center" }}>
+    <div className="fixed inset-0 flex flex-col lg:flex-row" style={{ backgroundImage: `url('/login-bg.png')`, backgroundSize: "cover", backgroundPosition: "center" }}>
 
       {/* Left side — transparent overlay on image */}
       <div className="hidden lg:flex lg:w-1/2" />
@@ -129,4 +129,5 @@ const Login = () => {
 };
 
 export default Login;
+
 
