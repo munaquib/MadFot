@@ -5,7 +5,6 @@ import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-
 const Login = () => {
   const [mode, setMode] = useState<"main" | "email">("main");
   const [email, setEmail] = useState("");
@@ -21,7 +20,7 @@ const Login = () => {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) { toast.error(error.message); }
-    else { toast.success("Welcome back! 🎉"); navigate("/"); }
+    else { toast.success("Welcome back!"); navigate("/"); }
   };
 
   const handleGoogleLogin = async () => {
@@ -32,102 +31,113 @@ const Login = () => {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col lg:flex-row" style={{ backgroundImage: `url('/login-bg.png')`, backgroundSize: "cover", backgroundPosition: "center" }}>
-
-      {/* Left side — transparent overlay on image */}
-      <div className="hidden lg:flex lg:w-1/2" />
-
-      {/* Right side — login card */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="lg:w-1/2 w-full flex items-center justify-center px-6 py-12"
-      >
-        <div className="rounded-3xl p-8 shadow-xl w-full max-w-md overflow-hidden" style={{ background: "rgba(245,240,232,0.92)", backdropFilter: "blur(8px)" }}>
+    <div style={{
+      position: "fixed",
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundImage: "url('/login-bg.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      display: "flex",
+      zIndex: 9999
+    }}>
+      <div style={{ flex: 1 }} />
+      <div style={{ width: "50%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          style={{
+            background: "rgba(245,240,232,0.93)",
+            backdropFilter: "blur(8px)",
+            borderRadius: "24px",
+            padding: "32px",
+            width: "100%",
+            maxWidth: "380px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+          }}>
 
           {mode !== "main" && (
-            <button onClick={() => setMode("main")} className="flex items-center gap-1 text-sm text-muted-foreground mb-4 hover:text-foreground">
-              <ArrowLeft className="w-4 h-4" /> Back
+            <button onClick={() => setMode("main")} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "13px", color: "#888", marginBottom: "16px", background: "none", border: "none", cursor: "pointer" }}>
+              <ArrowLeft size={14} /> Back
             </button>
           )}
 
           {mode === "main" && (
             <>
-              <h2 className="text-2xl font-bold text-foreground mb-1 font-serif">Welcome to MadFot</h2>
-              <p className="text-sm text-muted-foreground mb-6">Login or create account</p>
+              <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#1a2e1a", marginBottom: "4px", fontFamily: "serif" }}>Welcome to MadFot</h2>
+              <p style={{ fontSize: "13px", color: "#888", marginBottom: "24px" }}>Login or create account</p>
 
-              <div className="space-y-3">
-                {/* Google — Golden */}
-                <button onClick={handleGoogleLogin} disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl py-3 text-sm font-semibold transition-all"
-                  style={{ background: "linear-gradient(135deg, #b8922a, #d4a843, #c9a030)", color: "#1a2e1a" }}>
-                  <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                  Continue with Google
-                </button>
+              <button onClick={handleGoogleLogin} disabled={loading} style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                background: "linear-gradient(135deg, #b8922a, #d4a843, #c9a030)",
+                border: "none", borderRadius: "12px", padding: "13px", fontSize: "14px",
+                fontWeight: 600, color: "#1a2e1a", cursor: "pointer", marginBottom: "12px"
+              }}>
+                <img src="https://www.google.com/favicon.ico" style={{ width: "18px", height: "18px" }} alt="G" />
+                Continue with Google
+              </button>
 
-                <div className="flex items-center gap-3 my-1">
-                  <div className="flex-1 h-px" style={{ background: "rgba(139,115,85,0.3)" }} />
-                  <span className="text-xs text-muted-foreground">OR</span>
-                  <div className="flex-1 h-px" style={{ background: "rgba(139,115,85,0.3)" }} />
-                </div>
-
-                {/* Email — Outline */}
-                <button onClick={() => setMode("email")}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl py-3 text-sm font-semibold transition-all bg-transparent"
-                  style={{ border: "1.5px solid #1a3a2a", color: "#1a3a2a" }}>
-                  <Mail className="w-4 h-4" />
-                  Continue with Email
-                </button>
-
-                {/* Guest */}
-                <button onClick={() => navigate("/")}
-                  className="w-full py-3 text-sm transition-colors"
-                  style={{ color: "#c9a030" }}>
-                  Browse as Guest →
-                </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "8px 0" }}>
+                <div style={{ flex: 1, height: "1px", background: "rgba(139,115,85,0.3)" }} />
+                <span style={{ fontSize: "11px", color: "#aaa" }}>OR</span>
+                <div style={{ flex: 1, height: "1px", background: "rgba(139,115,85,0.3)" }} />
               </div>
 
-              <p className="text-center text-xs text-muted-foreground mt-4">
+              <button onClick={() => setMode("email")} style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                background: "transparent", border: "1.5px solid #1a3a2a",
+                borderRadius: "12px", padding: "13px", fontSize: "14px",
+                fontWeight: 600, color: "#1a3a2a", cursor: "pointer", marginBottom: "16px"
+              }}>
+                <Mail size={16} />
+                Continue with Email
+              </button>
+
+              <button onClick={() => navigate("/")} style={{
+                width: "100%", background: "none", border: "none", padding: "8px",
+                fontSize: "13px", color: "#c9a030", cursor: "pointer", marginBottom: "8px"
+              }}>
+                Browse as Guest →
+              </button>
+
+              <p style={{ textAlign: "center", fontSize: "12px", color: "#888" }}>
                 Don't have an account?{" "}
-                <Link to="/signup" style={{ color: "#c9a030" }} className="font-semibold hover:underline">Sign Up</Link>
+                <Link to="/signup" style={{ color: "#c9a030", fontWeight: 600, textDecoration: "none" }}>Sign Up</Link>
               </p>
             </>
           )}
 
           {mode === "email" && (
             <>
-              <h2 className="text-xl font-bold text-foreground mb-1 font-serif">Login with Email</h2>
-              <p className="text-sm text-muted-foreground mb-6">Enter your email and password</p>
-              <form onSubmit={handleEmailLogin} className="space-y-4">
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#1a2e1a", marginBottom: "4px", fontFamily: "serif" }}>Login with Email</h2>
+              <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>Enter your email and password</p>
+              <form onSubmit={handleEmailLogin} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ position: "relative" }}>
+                  <Mail size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#888" }} />
                   <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required
-                    className="w-full bg-white/70 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2" style={{ border: "1px solid rgba(139,115,85,0.3)" }} />
+                    style={{ width: "100%", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(139,115,85,0.3)", borderRadius: "12px", padding: "12px 12px 12px 38px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div style={{ position: "relative" }}>
+                  <Lock size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#888" }} />
                   <input type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                    className="w-full bg-white/70 rounded-xl py-3 pl-10 pr-12 text-sm focus:outline-none focus:ring-2" style={{ border: "1px solid rgba(139,115,85,0.3)" }} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {showPassword ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(139,115,85,0.3)", borderRadius: "12px", padding: "12px 40px 12px 38px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#888" }}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                <button type="submit" disabled={loading}
-                  className="w-full font-bold py-3 rounded-xl disabled:opacity-50 transition-all"
-                  style={{ background: "linear-gradient(135deg, #b8922a, #d4a843, #c9a030)", color: "#1a2e1a" }}>
+                <button type="submit" disabled={loading} style={{
+                  width: "100%", background: "linear-gradient(135deg, #b8922a, #d4a843, #c9a030)",
+                  border: "none", borderRadius: "12px", padding: "13px", fontSize: "14px",
+                  fontWeight: 700, color: "#1a2e1a", cursor: "pointer", opacity: loading ? 0.6 : 1
+                }}>
                   {loading ? "Logging in..." : "Login"}
                 </button>
               </form>
             </>
           )}
-
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };
 
 export default Login;
-
-
