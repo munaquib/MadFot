@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { ArrowLeft, User, Bell, Lock, Palette, Globe, Trash2, ChevronRight, Check, Moon, Sun } from "lucide-react";
+import { ArrowLeft, User, Bell, Lock, Globe, Trash2, ChevronRight, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage, availableLanguages } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,11 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
   const { t, langName, setLanguage, langCode } = useLanguage();
 
   const [showLangDialog, setShowLangDialog] = useState(false);
-  const [showAppearance, setShowAppearance] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -49,7 +46,6 @@ const Settings = () => {
     { icon: User, label: t("editProfile"), desc: t("namePhotoLocation"), action: () => navigate("/edit-profile") },
     { icon: Bell, label: t("notifications"), desc: t("pushAlerts"), action: () => navigate("/notifications") },
     { icon: Lock, label: t("privacySecurity"), desc: t("passwordTwoFA"), action: () => setShowPrivacy(true) },
-    { icon: Palette, label: t("appearance"), desc: t("themeFontSize"), action: () => setShowAppearance(true) },
     { icon: Globe, label: t("language"), desc: langName, action: () => setShowLangDialog(true) },
   ];
 
@@ -91,7 +87,6 @@ const Settings = () => {
           <DialogHeader>
             <DialogTitle className="font-serif">{t("selectLanguage")}</DialogTitle>
           </DialogHeader>
-
           <div className="flex-1 overflow-y-auto space-y-1 pr-1">
             {availableLanguages.map((lang) => (
               <button key={lang.code} onClick={() => handleLanguageChange(lang)}
@@ -100,33 +95,6 @@ const Settings = () => {
                 {langCode === lang.code && <Check className="w-4 h-4 text-secondary" />}
               </button>
             ))}
-            
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Appearance Dialog — REAL Dark Mode */}
-      <Dialog open={showAppearance} onOpenChange={setShowAppearance}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-serif">{t("appearance")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{t("themePreference")}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => { setTheme("light"); toast.success("Light mode enabled"); }}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === "light" ? "border-secondary bg-secondary/5" : "border-border/50 hover:bg-muted/30"}`}>
-                <Sun className={`w-6 h-6 ${theme === "light" ? "text-secondary" : "text-muted-foreground"}`} />
-                <span className={`text-sm font-medium ${theme === "light" ? "text-foreground" : "text-muted-foreground"}`}>{t("light")}</span>
-              </button>
-              <button
-                onClick={() => { setTheme("dark"); toast.success("Dark mode enabled"); }}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === "dark" ? "border-secondary bg-secondary/10" : "border-border/50 hover:bg-muted/30"}`}>
-                <Moon className={`w-6 h-6 ${theme === "dark" ? "text-secondary" : "text-muted-foreground"}`} />
-                <span className={`text-sm font-medium ${theme === "dark" ? "text-foreground" : "text-muted-foreground"}`}>{t("dark")}</span>
-              </button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
