@@ -175,3 +175,56 @@ html { scroll-behavior: smooth; }
 /* RTL support */
 [dir="rtl"] .font-serif { letter-spacing: 0; }
 [dir="rtl"] .marquee-track { animation-direction: reverse; }
+
+/* ===== DARK MODE ===== */
+@layer base {
+  .dark {
+    --background: 153 30% 8%;
+    --foreground: 38 40% 88%;
+
+    --card: 153 25% 11%;
+    --card-foreground: 38 35% 85%;
+
+    --popover: 153 25% 11%;
+    --popover-foreground: 38 35% 85%;
+
+    --primary: 43 56% 53%;
+    --primary-foreground: 153 55% 10%;
+
+    --secondary: 43 50% 45%;
+    --secondary-foreground: 153 55% 10%;
+
+    --muted: 153 20% 15%;
+    --muted-foreground: 38 20% 55%;
+
+    --accent: 43 50% 40%;
+    --accent-foreground: 153 55% 10%;
+
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 153 20% 18%;
+    --input: 153 20% 14%;
+    --ring: 43 56% 53%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(153, 30%, 10%), hsl(153, 25%, 16%));
+    --gradient-hero: linear-gradient(135deg, hsl(43, 50%, 40%), hsl(43, 45%, 33%));
+    --gradient-bottom-nav: linear-gradient(180deg, hsl(153, 25%, 10%) 0%, hsl(153, 22%, 9%) 100%);
+    --gradient-card-shine: linear-gradient(135deg, hsl(43, 50%, 40%), hsl(43, 40%, 32%));
+    --gradient-bg: linear-gradient(180deg, hsl(153, 30%, 7%) 0%, hsl(153, 25%, 9%) 30%, hsl(153, 22%, 8%) 60%, hsl(153, 20%, 8%) 100%);
+    --gradient-page: linear-gradient(135deg, hsl(153, 30%, 8%) 0%, hsl(153, 25%, 9%) 50%, hsl(153, 22%, 8%) 100%);
+
+    --sidebar-background: 153 30% 6%;
+    --sidebar-foreground: 43 50% 50%;
+    --sidebar-primary: 43 50% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 153 25% 12%;
+    --sidebar-accent-foreground: 43 50% 50%;
+    --sidebar-border: 153 20% 14%;
+    --sidebar-ring: 43 50% 45%;
+  }
+
+  .dark body {
+    background: var(--gradient-bg);
+  }
+}

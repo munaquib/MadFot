@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, MapPin, User, ShoppingCart, Globe, Crown, ChevronDown, Menu, SlidersHorizontal, Camera } from "lucide-react";
+import { Search, MapPin, User, ShoppingCart, Crown, Menu, SlidersHorizontal, Camera } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-
-const languages = [
-  "English", "हिन्दी", "বাংলা", "தமிழ்", "తెలుగు", "ಕನ್ನಡ", "മലയാളം",
-  "मराठी", "ગુજરાતી", "ਪੰਜਾਬੀ", "اردو"
-];
 
 const marqueeItems = [
   "🔥 Flat 80% Off on Bridal Lehengas",
@@ -28,8 +23,6 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
   const navigate = useNavigate();
   const { user } = useAuth();
   const [city, setCity] = useState("Detecting...");
-  const [showLangMenu, setShowLangMenu] = useState(false);
-  const [selectedLang, setSelectedLang] = useState("English");
   const [searchQuery, setSearchQuery] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +33,6 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
   const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // TODO: AI-powered visual search
     import("sonner").then(({ toast }) => {
       toast.info("Image search coming soon! 📸 AI will find similar products.");
     });
@@ -100,7 +92,7 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
             </button>
           )}
 
-          {/* Logo - visible on mobile, hidden on desktop when sidebar open */}
+          {/* Logo */}
           <div
             className={`flex items-center gap-2 cursor-pointer shrink-0 ${sidebarOpen ? "lg:hidden" : ""}`}
             onClick={() => navigate("/")}
@@ -108,11 +100,11 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
             <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
               <Crown className="w-4 h-4 text-primary" />
             </div>
-            <h1 className="text-lg font-extrabold text-secondary font-serif">MadFot</h1>
+            <h1 className="text-lg font-extrabold text-secondary font-serif hidden sm:block">MadFot</h1>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative flex-1 min-w-[150px] max-w-[560px] mx-auto">
+          {/* Search Bar — full width, longer */}
+          <div className="relative flex-1 mx-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -160,7 +152,7 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
             <span className="max-w-[80px] truncate">{city}</span>
           </button>
 
-          {/* Right actions */}
+          {/* Right actions — Language button REMOVED */}
           <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
             <button
               onClick={() => navigate(user ? "/profile" : "/login")}
@@ -171,34 +163,6 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
               <span className="hidden md:inline">Profile</span>
             </button>
 
-            {/* Language */}
-            <div className="relative">
-              <button
-                onClick={() => setShowLangMenu(!showLangMenu)}
-                className="flex items-center gap-0.5 text-secondary/80 hover:text-secondary text-xs px-1.5 py-1.5 rounded-lg transition-colors"
-                aria-label="Language"
-              >
-                <Globe className="w-3.5 h-3.5 shrink-0" />
-                <ChevronDown className="w-3 h-3 shrink-0" />
-              </button>
-              {showLangMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-card rounded-xl shadow-luxury border border-border z-50 py-1 min-w-[140px] max-h-60 overflow-y-auto">
-                  {languages.map((lang) => (
-                    <button
-                      key={lang}
-                      onClick={() => { setSelectedLang(lang); setShowLangMenu(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors ${
-                        selectedLang === lang ? "text-secondary font-semibold bg-primary/5" : "text-foreground"
-                      }`}
-                    >
-                      {lang}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Cart - hidden on mobile, shown on desktop */}
             <button
               onClick={() => navigate("/wishlist")}
               className="hidden sm:flex items-center gap-0.5 text-secondary/80 hover:text-secondary text-xs px-1.5 py-1.5 rounded-lg transition-colors shrink-0"
