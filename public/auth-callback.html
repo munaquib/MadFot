@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MadFot - Logging in...</title>
+  <script>
+    var url = window.location.href;
+    var hash = window.location.hash;
+    var isNativeApp = hash.includes('access_token') && 
+                      /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+    if (isNativeApp) {
+      // APK ke liye: deep link open karo
+      var newUrl = url.replace("https://mad-fot.vercel.app/auth-callback.html", "madfot://login-callback");
+      window.location.href = newUrl;
+      setTimeout(function() {
+        document.getElementById('msg').style.display = 'block';
+      }, 2000);
+    } else {
+      // Website ke liye: seedha home page par redirect karo
+      window.location.replace('/');
+    }
+  </script>
+</head>
+<body style="background:#1a1a1a; color:white; font-family:sans-serif; text-align:center; padding:50px;">
+  <h2>MadFot</h2>
+  <p>Login successful! Redirecting...</p>
+  <p id="msg" style="display:none; color:orange;">
+    App nahi khula. Please app manually open karo.
+  </p>
+</body>
+</html>

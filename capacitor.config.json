@@ -1,1 +1,18 @@
-{"appId":"com.madfot.app","appName":"MadFot","webDir":"dist"}
+{
+  "appId": "com.madfot.app",
+  "appName": "MadFot",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "618115455469-dngo03b6681obtl2b5nvprvhfpbfglln.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

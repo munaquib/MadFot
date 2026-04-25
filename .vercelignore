@@ -1,0 +1,13 @@
+node_modules
+android
+dist
+madfot-apk-output12
+madfot-apk-output13
+madfot.apks
+madfot12.zip
+madfot13.zip
+bundletool.jar
+madfot-release.jks
+*.jks
+*.apks
+*.jar
