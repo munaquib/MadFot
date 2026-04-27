@@ -14,7 +14,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem("madfot_theme") as Theme) || "light";
+    return (localStorage.getItem("MadFod_theme") as Theme) || "light";
   });
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("madfot_theme", theme);
+    localStorage.setItem("MadFod_theme", theme);
   }, [theme]);
 
   const setTheme = (t: Theme) => setThemeState(t);

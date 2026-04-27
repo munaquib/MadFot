@@ -129,7 +129,7 @@ const Index = () => {
       {/* Hero Banner */}
       <div className="px-4 md:px-6 pt-4">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden shadow-luxury relative">
-          <img src={heroLuxury} alt="MadFot - Buy & Sell Pre-Loved Luxury Fashion" className="w-full h-44 md:h-56 lg:h-72 object-cover" />
+          <img src={heroLuxury} alt="MadFod - Buy & Sell Pre-Loved Luxury Fashion" className="w-full h-44 md:h-56 lg:h-72 object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/70 to-transparent flex flex-col items-start justify-center px-5 md:px-10">
             <span className="text-[10px] md:text-xs text-secondary/70 font-medium tracking-widest uppercase">Exclusive Pieces, Exceptional Prices</span>
             <h2 className="text-xl md:text-3xl lg:text-4xl font-extrabold text-secondary font-serif leading-tight mt-1">Buy & Sell Pre-Loved<br />Luxury Fashion</h2>

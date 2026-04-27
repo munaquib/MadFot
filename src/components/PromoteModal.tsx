@@ -82,7 +82,7 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
           key: orderData.key_id,
           amount: orderData.order.amount,
           currency: orderData.order.currency,
-          name: "MadFot Ads",
+          name: "MadFod Ads",
           description: `Promote: ${adTitle}`,
           order_id: orderData.order.id,
           handler: () => resolve(),

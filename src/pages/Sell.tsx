@@ -112,7 +112,7 @@ const Sell = () => {
     <AppLayout>
       <div className="gradient-primary px-4 md:px-6 py-5 rounded-b-[2rem] lg:rounded-b-3xl">
         <h1 className="text-secondary font-bold text-lg md:text-xl font-serif">Sell Your Outfit</h1>
-        <p className="text-secondary/60 text-xs md:text-sm">Give your premium clothes a new home on MadFot</p>
+        <p className="text-secondary/60 text-xs md:text-sm">Give your premium clothes a new home on MadFod</p>
       </div>
 
       <div className="px-4 md:px-6 py-4 max-w-2xl mx-auto space-y-4">

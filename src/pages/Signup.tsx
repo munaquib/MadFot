@@ -30,9 +30,9 @@ const Signup = () => {
           <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-3 rounded-2xl gradient-hero flex items-center justify-center shadow-card">
             <Crown className="w-8 h-8 lg:w-10 lg:h-10 text-secondary-foreground" />
           </div>
-          <h1 className="text-2xl lg:text-4xl font-extrabold text-secondary font-serif">MadFot</h1>
+          <h1 className="text-2xl lg:text-4xl font-extrabold text-secondary font-serif">MadFod</h1>
           <p className="text-secondary/60 text-sm lg:text-base mt-1">Join the Fashion Revolution</p>
-          <p className="hidden lg:block text-secondary/40 text-sm mt-4 max-w-xs mx-auto">Sell your premium pre-owned outfits and earn money. Join the MadFot community today!</p>
+          <p className="hidden lg:block text-secondary/40 text-sm mt-4 max-w-xs mx-auto">Sell your premium pre-owned outfits and earn money. Join the MadFod community today!</p>
         </motion.div>
       </div>
 

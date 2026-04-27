@@ -35,7 +35,11 @@ const Login = () => {
     setLoading(true);
     const { error } = await signInWithGoogle();
     setLoading(false);
-    if (error) { toast.error(error.message); }
+    if (error) {
+      toast.error(error.message || "Google login failed");
+    } else {
+      navigate("/"); // ✅ Fix: Google login ke baad navigate karo
+    }
   };
 
   // =====================
@@ -50,10 +54,7 @@ const Login = () => {
         backgroundPosition: "center",
         display: "flex", zIndex: 9999
       }}>
-        {/* Left Side - transparent so full background image shows */}
         <div style={{ width: "50%", height: "100%" }} />
-
-        {/* Right Side - Login Card */}
         <div style={{
           width: "50%", height: "100%",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -88,7 +89,7 @@ const Login = () => {
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "26px", fontWeight: 700,
                   color: "#1a1a1a", margin: "0 0 6px 0"
-                }}>Welcome to MadFot</h2>
+                }}>Welcome to MadFod</h2>
                 <p style={{ fontSize: "14px", color: "#888", margin: "0 0 32px 0" }}>
                   Login or create account
                 </p>
@@ -112,27 +113,19 @@ const Login = () => {
                   Continue with Google
                 </button>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                  <div style={{ flex: 1, height: "1px", background: "#e0d8cc" }} />
-                  <span style={{ fontSize: "13px", color: "#aaa", fontWeight: 500 }}>OR</span>
-                  <div style={{ flex: 1, height: "1px", background: "#e0d8cc" }} />
-                </div>
-
                 <button onClick={() => setMode("email")} style={{
                   width: "100%", height: "54px",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
-                  background: "transparent", border: "2px solid #1a4a2e",
-                  borderRadius: "12px", fontSize: "15px", fontWeight: 600, color: "#1a4a2e",
-                  cursor: "pointer", marginBottom: "24px"
+                  background: "#1e4d2f", border: "none", borderRadius: "12px",
+                  fontSize: "15px", fontWeight: 600, color: "#f0d878",
+                  cursor: "pointer", marginBottom: "20px"
                 }}>
-                  <Mail size={18} /> Continue with Email
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="3" stroke="#f0d878" strokeWidth="1.8"/><path d="M2 8 L12 14 L22 8" stroke="#f0d878" strokeWidth="1.8"/></svg>
+                  Continue with Email
                 </button>
 
                 <div style={{ textAlign: "center", marginBottom: "16px" }}>
-                  <button onClick={() => navigate("/")} style={{
-                    background: "none", border: "none", fontSize: "14px",
-                    color: "#c9a227", cursor: "pointer", fontWeight: 500
-                  }}>Browse as Guest →</button>
+                  <button onClick={() => navigate("/")} style={{ background: "none", border: "none", fontSize: "14px", color: "#6a5a4a", cursor: "pointer", fontWeight: 500 }}>Browse as Guest →</button>
                 </div>
 
                 <p style={{ textAlign: "center", fontSize: "13px", color: "#888", margin: 0 }}>
@@ -182,7 +175,7 @@ const Login = () => {
   }
 
   // =====================
-  // MOBILE LAYOUT — SAME AS BEFORE (koi change nahi)
+  // MOBILE LAYOUT
   // =====================
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundImage: "url('/login-bg.png')", backgroundSize: "cover", backgroundPosition: "center top", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden", zIndex: 9999 }}>
@@ -206,7 +199,7 @@ const Login = () => {
         {mode !== "main" && (<button onClick={() => setMode("main")} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#8a7a6a", marginBottom: "16px", background: "none", border: "none", cursor: "pointer", padding: 0, position: "relative", zIndex: 4 }}><ArrowLeft size={14} /> Back</button>)}
         {mode === "main" && (
           <div style={{ position: "relative", zIndex: 4 }}>
-            <h2 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "23px", fontWeight: 700, color: "#1a2a1a", margin: "0 0 5px 0" }}>Welcome to MadFot</h2>
+            <h2 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "23px", fontWeight: 700, color: "#1a2a1a", margin: "0 0 5px 0" }}>Welcome to MadFod</h2>
             <p style={{ fontSize: "13px", color: "#8a7a6a", margin: "0 0 24px 0" }}>Login or create account</p>
             <button onClick={handleGoogleLogin} disabled={loading} style={{ width: "100%", height: "54px", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", background: "#ffffff", border: "1.5px solid #e8e0d0", borderRadius: "14px", fontSize: "15px", fontWeight: 600, color: "#2a2a2a", cursor: "pointer", marginBottom: "12px", opacity: loading ? 0.7 : 1 }}>
               <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>

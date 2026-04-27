@@ -47,7 +47,7 @@ const HelpSupport = () => {
   const helpItems = [
     { icon: FileText, label: "FAQs", desc: "Common questions answered", action: () => setShowFaqs(true) },
     { icon: MessageCircle, label: "Live Chat", desc: "Chat with our support team", action: () => setShowChat(true) },
-    { icon: Mail, label: "Email Us", desc: "support@madfot.com", action: () => { window.location.href = "mailto:support@madfot.com"; } },
+    { icon: Mail, label: "Email Us", desc: "support@MadFod.com", action: () => { window.location.href = "mailto:support@MadFod.com"; } },
     { icon: HelpCircle, label: "Report a Problem", desc: "Bug reports & feedback", action: () => setShowReport(true) },
   ];
 

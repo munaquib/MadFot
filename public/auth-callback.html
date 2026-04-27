@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>MadFot - Logging in...</title>
+  <title>MadFod - Logging in...</title>
   <script>
     var url = window.location.href;
     var hash = window.location.hash;
@@ -11,7 +11,7 @@
 
     if (isNativeApp) {
       // APK ke liye: deep link open karo
-      var newUrl = url.replace("https://mad-fot.vercel.app/auth-callback.html", "madfot://login-callback");
+      var newUrl = url.replace("https://mad-fot.vercel.app/auth-callback.html", "MadFod://login-callback");
       window.location.href = newUrl;
       setTimeout(function() {
         document.getElementById('msg').style.display = 'block';
@@ -23,7 +23,7 @@
   </script>
 </head>
 <body style="background:#1a1a1a; color:white; font-family:sans-serif; text-align:center; padding:50px;">
-  <h2>MadFot</h2>
+  <h2>MadFod</h2>
   <p>Login successful! Redirecting...</p>
   <p id="msg" style="display:none; color:orange;">
     App nahi khula. Please app manually open karo.

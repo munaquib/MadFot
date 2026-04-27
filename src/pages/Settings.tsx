@@ -124,7 +124,7 @@ const Settings = () => {
           <p className="text-sm text-muted-foreground">{t("deleteConfirm")}</p>
           <div className="flex gap-3 mt-2">
             <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted/30 transition-colors">{t("cancel")}</button>
-            <button onClick={() => { toast.error("Contact support@madfot.com to delete your account."); setShowDeleteConfirm(false); }} className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-xl text-sm font-semibold hover:opacity-90">{t("delete")}</button>
+            <button onClick={() => { toast.error("Contact support@MadFod.com to delete your account."); setShowDeleteConfirm(false); }} className="flex-1 py-2.5 bg-destructive text-destructive-foreground rounded-xl text-sm font-semibold hover:opacity-90">{t("delete")}</button>
           </div>
         </DialogContent>
       </Dialog>

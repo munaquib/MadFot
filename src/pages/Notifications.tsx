@@ -30,7 +30,7 @@ const Notifications = () => {
           setNotifications((prev) => [n, ...prev]);
           // Show browser notification
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(n.title || "MadFot", { body: n.message || "", icon: "/icon-192x192.png" });
+            new Notification(n.title || "MadFod", { body: n.message || "", icon: "/icon-192x192.png" });
           }
         })
       .subscribe();

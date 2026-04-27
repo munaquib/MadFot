@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "106501626697",
+    "project_id": "MadFod",
+    "storage_bucket": "MadFod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106501626697:android:93c6025223c3df54321898",
+        "android_client_info": {
+          "package_name": "com.madfot.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDx5M3CMvIopdTtmKaxJmsDHfjca73XJDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

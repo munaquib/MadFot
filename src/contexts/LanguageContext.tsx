@@ -6,7 +6,7 @@ const translations: Record<string, Record<string, string>> = {
     chat: "Chat", notifications: "Notifications", profile: "Profile",
     shopNow: "Shop Now", settings: "Settings", logout: "Logout",
     login: "Login", signup: "Sign Up", loading: "Loading...",
-    welcome: "Welcome to MadFot", loginOrCreate: "Login or create account",
+    welcome: "Welcome to MadFod", loginOrCreate: "Login or create account",
     continueGoogle: "Continue with Google", continueEmail: "Continue with Email",
     browseGuest: "Browse as Guest →", noAccount: "Don't have an account?",
     loginEmail: "Login with Email", enterEmail: "Enter your email and password",
@@ -27,7 +27,7 @@ const translations: Record<string, Record<string, string>> = {
     chat: "चैट", notifications: "सूचनाएं", profile: "प्रोफ़ाइल",
     shopNow: "अभी खरीदें", settings: "सेटिंग्स", logout: "लॉग आउट",
     login: "लॉगिन", signup: "साइन अप", loading: "लोड हो रहा है...",
-    welcome: "MadFot में आपका स्वागत है", loginOrCreate: "लॉगिन या नया खाता बनाएं",
+    welcome: "MadFod में आपका स्वागत है", loginOrCreate: "लॉगिन या नया खाता बनाएं",
     continueGoogle: "Google से जारी रखें", continueEmail: "Email से जारी रखें",
     browseGuest: "मेहमान के रूप में ब्राउज़ करें →", noAccount: "खाता नहीं है?",
     loginEmail: "Email से लॉगिन", enterEmail: "अपना ईमेल और पासवर्ड दर्ज करें",
@@ -49,7 +49,7 @@ const translations: Record<string, Record<string, string>> = {
     chat: "Baat Karo", notifications: "Notifications", profile: "Profile",
     shopNow: "Abhi Kharido", settings: "Settings", logout: "Log Out",
     login: "Login", signup: "Sign Up", loading: "Load ho raha hai...",
-    welcome: "MadFot pe Aapka Swagat Hai", loginOrCreate: "Login karo ya naya account banao",
+    welcome: "MadFod pe Aapka Swagat Hai", loginOrCreate: "Login karo ya naya account banao",
     continueGoogle: "Google se Continue Karo", continueEmail: "Email se Continue Karo",
     browseGuest: "Guest ke roop mein Browse Karo →", noAccount: "Account nahi hai?",
     loginEmail: "Email se Login Karo", enterEmail: "Apna email aur password daalo",
@@ -86,14 +86,14 @@ const LanguageContext = createContext<LanguageContextType>({} as LanguageContext
 export const useLanguage = () => useContext(LanguageContext);
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
-  const [langCode, setLangCode] = useState(() => localStorage.getItem("madfot_lang_code") || "en");
-  const [langName, setLangName] = useState(() => localStorage.getItem("madfot_lang_name") || "English");
+  const [langCode, setLangCode] = useState(() => localStorage.getItem("MadFod_lang_code") || "en");
+  const [langName, setLangName] = useState(() => localStorage.getItem("MadFod_lang_name") || "English");
 
   const setLanguage = (code: string, name: string) => {
     setLangCode(code);
     setLangName(name);
-    localStorage.setItem("madfot_lang_code", code);
-    localStorage.setItem("madfot_lang_name", name);
+    localStorage.setItem("MadFod_lang_code", code);
+    localStorage.setItem("MadFod_lang_name", name);
     document.documentElement.lang = code === "hinglish" ? "hi-Latn" : code;
     document.documentElement.dir = "ltr";
   };

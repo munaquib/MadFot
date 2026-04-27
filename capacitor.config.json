@@ -1,6 +1,6 @@
 {
-  "appId": "com.madfot.app",
-  "appName": "MadFot",
+  "appId": "com.MadFod.app",
+  "appName": "MadFod",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

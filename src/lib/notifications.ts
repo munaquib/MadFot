@@ -55,7 +55,7 @@ export const setupMessageNotifications = (userId: string) => {
     }, (payload: any) => {
       const msg = payload.new;
       showLocalNotification(
-        "New Message on MadFot 💬",
+        "New Message on MadFod 💬",
         msg.content?.slice(0, 60) || "You have a new message",
         "/icon-192x192.png"
       );

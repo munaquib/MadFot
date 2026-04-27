@@ -32,7 +32,7 @@ const DesktopSidebar = ({ open, onToggle }: DesktopSidebarProps) => {
           <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shadow-card">
             <Crown className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="text-xl font-extrabold text-secondary font-serif">MadFot</h1>
+          <h1 className="text-xl font-extrabold text-secondary font-serif">MadFod</h1>
         </div>
         <button onClick={onToggle} className="text-secondary/60 hover:text-secondary transition-colors">
           <X className="w-5 h-5" />
@@ -62,7 +62,7 @@ const DesktopSidebar = ({ open, onToggle }: DesktopSidebarProps) => {
 
       {/* Footer */}
       <div className="px-6 py-4 text-secondary/30 text-xs border-t border-secondary/10">
-        © 2026 MadFot
+        © 2026 MadFod
       </div>
     </aside>
   );

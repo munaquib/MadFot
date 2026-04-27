@@ -100,7 +100,7 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
             <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
               <Crown className="w-4 h-4 text-primary" />
             </div>
-            <h1 className="text-lg font-extrabold text-secondary font-serif hidden sm:block">MadFot</h1>
+            <h1 className="text-lg font-extrabold text-secondary font-serif block">MadFod</h1>
           </div>
 
           {/* Search Bar — full width, longer */}

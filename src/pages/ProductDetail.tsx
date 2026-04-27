@@ -23,7 +23,7 @@ const ProductDetail = () => {
   const [paying, setPaying] = useState(false);
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [sellerName, setSellerName] = useState("MadFot Seller");
+  const [sellerName, setSellerName] = useState("MadFod Seller");
   const [sellerAvgRating, setSellerAvgRating] = useState(0);
   const [sellerTotalReviews, setSellerTotalReviews] = useState(0);
   const [sellerIsVerified, setSellerIsVerified] = useState(false);
@@ -89,7 +89,7 @@ const ProductDetail = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create order");
       const options = {
-        key: data.key_id, amount: data.order.amount, currency: data.order.currency, name: "MadFot", description: product.title, order_id: data.order.id,
+        key: data.key_id, amount: data.order.amount, currency: data.order.currency, name: "MadFod", description: product.title, order_id: data.order.id,
         handler: function () { toast.success("Payment successful! 🎉 Order placed."); },
         prefill: { name: user.user_metadata?.full_name || "", email: user.email || "", contact: "" },
         theme: { color: "#0F3D2E" },
@@ -123,7 +123,7 @@ const ProductDetail = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
-    const text = `Check out ${product?.title} on MadFot for ₹${product?.price?.toLocaleString("en-IN")}!`;
+    const text = `Check out ${product?.title} on MadFod for ₹${product?.price?.toLocaleString("en-IN")}!`;
     if (navigator.share) {
       try { await navigator.share({ title: product?.title, text, url }); } catch {}
     } else {

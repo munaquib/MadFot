@@ -28,7 +28,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="madfot" android:host="login-callback" />
+                <data android:scheme="MadFod" android:host="login-callback" />
             </intent-filter>
         </activity>
         <provider

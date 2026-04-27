@@ -47,7 +47,7 @@ serve(async (req) => {
       body: JSON.stringify({
         amount: amount * 100, // Razorpay expects amount in paise
         currency: "INR",
-        receipt: `madfot_${Date.now()}`,
+        receipt: `MadFod_${Date.now()}`,
         notes: { product_title },
       }),
     });

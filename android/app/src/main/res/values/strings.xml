@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">MadFot</string>
-    <string name="title_activity_main">MadFot</string>
-    <string name="package_name">com.madfot.app</string>
-    <string name="custom_url_scheme">com.madfot.app</string>
+    <string name="app_name">MadFod</string>
+    <string name="title_activity_main">MadFod</string>
+    <string name="package_name">com.MadFod.app</string>
+    <string name="custom_url_scheme">com.MadFod.app</string>
 </resources>
