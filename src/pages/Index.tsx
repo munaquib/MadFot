@@ -252,6 +252,65 @@ const Index = () => {
         )}
       </div>
 
+      {/* About Section */}
+      <div className="px-4 md:px-6 mt-8 mb-4">
+        <div className="glass-card rounded-2xl border border-border/30 shadow-card overflow-hidden">
+          {/* Header */}
+          <div className="bg-primary px-5 py-4">
+            <h2 className="text-secondary font-bold text-lg font-serif">About MadFod</h2>
+            <p className="text-secondary/60 text-xs mt-0.5">India ka Premium Pre-Loved Fashion Marketplace</p>
+          </div>
+          {/* Content */}
+          <div className="p-5 space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <span className="font-bold text-foreground">MadFod</span> ek trusted platform hai jahan aap apne pre-loved ethnic aur luxury fashion — lehenga, sherwani, saree, gown aur bahut kuch — buy aur sell kar sakte hain. Hum believe karte hain ki premium fashion sabke liye accessible hona chahiye.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { emoji: "🛍️", title: "Buy Smart", desc: "Up to 80% off on branded ethnic wear" },
+                { emoji: "💰", title: "Sell Easy", desc: "List in 2 mins, earn from old clothes" },
+                { emoji: "✅", title: "100% Verified", desc: "Every seller & product is verified" },
+                { emoji: "🔒", title: "Safe & Secure", desc: "Secure payments via Razorpay" },
+              ].map((item) => (
+                <div key={item.title} className="bg-muted/50 rounded-xl p-3 flex items-start gap-2">
+                  <span className="text-xl">{item.emoji}</span>
+                  <div>
+                    <p className="text-xs font-bold text-foreground">{item.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-border/30 pt-3 flex items-center justify-between">
+              <div className="text-center">
+                <p className="text-lg font-extrabold text-secondary">500+</p>
+                <p className="text-[10px] text-muted-foreground">Products Listed</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-extrabold text-secondary">100%</p>
+                <p className="text-[10px] text-muted-foreground">Authentic</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-extrabold text-secondary">4.8★</p>
+                <p className="text-[10px] text-muted-foreground">User Rating</p>
+              </div>
+            </div>
+            {/* Footer links */}
+            <div className="border-t border-border/30 pt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+              <span className="cursor-pointer hover:text-secondary transition-colors">📋 About Us</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">🤝 Sell With Us</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">🔒 Privacy Policy</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">📞 Contact Us</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">↩️ Returns Policy</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">💳 Payment Info</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">❓ Help & FAQ</span>
+              <span className="cursor-pointer hover:text-secondary transition-colors">📱 Download App</span>
+            </div>
+            <p className="text-center text-[10px] text-muted-foreground pt-1">© 2026 MadFod. All rights reserved. Made with ❤️ in India</p>
+          </div>
+        </div>
+      </div>
+
       <WhyBuyPreLoved />
     </AppLayout>
   );

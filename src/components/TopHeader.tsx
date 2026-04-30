@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, MapPin, User, ShoppingCart, Crown, Menu, SlidersHorizontal, Camera } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, MapPin, User, ShoppingCart, Crown, Menu, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,21 +24,6 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
   const { user } = useAuth();
   const [city, setCity] = useState("Detecting...");
   const [searchQuery, setSearchQuery] = useState("");
-  const imageInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageSearch = () => {
-    imageInputRef.current?.click();
-  };
-
-  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    import("sonner").then(({ toast }) => {
-      toast.info("Image search coming soon! 📸 AI will find similar products.");
-    });
-    e.target.value = "";
-  };
-
   const detectCity = async (pos: GeolocationPosition) => {
     try {
       const res = await fetch(
@@ -111,18 +96,10 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Search lehenga, sherwani, saree..."
-              className="w-full bg-card rounded-lg py-2 pl-9 pr-[72px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              placeholder="Search..."
+              className="w-full bg-card rounded-lg py-2 pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-              <button
-                type="button"
-                onClick={handleImageSearch}
-                aria-label="Search by image"
-                className="w-7 h-7 bg-secondary/80 rounded-md flex items-center justify-center hover:opacity-90 transition-opacity"
-              >
-                <Camera className="w-3.5 h-3.5 text-primary" />
-              </button>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <button
                 type="button"
                 onClick={(e) => {
@@ -135,12 +112,11 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
                   navigate("/search");
                 }}
                 aria-label="Open filters"
-                className="w-7 h-7 bg-secondary rounded-md flex items-center justify-center hover:opacity-90 transition-opacity"
+                className="w-7 h-7 bg-secondary rounded-lg flex items-center justify-center hover:opacity-90 transition-opacity"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
               </button>
             </div>
-            <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
           </div>
 
           {/* Location */}
