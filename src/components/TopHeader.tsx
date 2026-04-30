@@ -97,9 +97,9 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search..."
-              className="w-full bg-card rounded-lg py-2 pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full bg-card rounded-lg py-2 pl-9 pr-20 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
               <button
                 type="button"
                 onClick={(e) => {
@@ -112,9 +112,10 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
                   navigate("/search");
                 }}
                 aria-label="Open filters"
-                className="w-7 h-7 bg-secondary rounded-lg flex items-center justify-center hover:opacity-90 transition-opacity"
+                className="flex items-center gap-1 bg-secondary text-primary text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+                <SlidersHorizontal className="w-3 h-3" />
+                Filter
               </button>
             </div>
           </div>
