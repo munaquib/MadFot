@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, CheckCheck, MoreVertical, Flag, Ban } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Message {
   id: string;
@@ -53,6 +54,25 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+
+  // Report/Block states
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(e.target as Node)) {
+        setShowChatMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
@@ -223,7 +243,6 @@ const Chat = () => {
     if (error) { toast.error("Failed to send message"); setMessage(content); return; }
     if (data) {
       setMessages(prev => [...prev, data]);
-      // Send notification to receiver
       await supabase.from("notifications").insert({
         user_id: activeChat.user_id,
         type: "message",
@@ -234,23 +253,98 @@ const Chat = () => {
     }
   };
 
+  // Report user from chat
+  const handleReportUser = async () => {
+    if (!user || !activeChat) return;
+    if (!reportReason.trim()) { toast.error("Please select a reason"); return; }
+    setReportSubmitting(true);
+    try {
+      await supabase.from("reports").insert({
+        reporter_id: user.id,
+        reported_user_id: activeChat.user_id,
+        reason: reportReason,
+        type: "chat_user",
+      });
+      toast.success("Report submitted. We'll review it shortly. 🙏");
+      setShowReportDialog(false);
+      setReportReason("");
+    } catch {
+      toast.error("Failed to submit report. Please try again.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  // Block user from chat
+  const handleBlockUser = async () => {
+    if (!user || !activeChat) return;
+    try {
+      await supabase.from("blocked_users").insert({
+        blocker_id: user.id,
+        blocked_id: activeChat.user_id,
+      });
+      toast.success(`${activeChat.full_name} has been blocked.`);
+      setShowBlockDialog(false);
+      setActiveChat(null);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      fetchConversations();
+    } catch {
+      toast.error("Failed to block user. Please try again.");
+    }
+  };
+
   if (activeChat) {
     return (
       <AppLayout>
         <div className="flex flex-col h-[calc(100vh-120px)]">
+          {/* Chat Header */}
           <div className="gradient-primary px-4 py-3 flex items-center gap-3 rounded-b-2xl">
-            <button onClick={() => { setActiveChat(null); if (channelRef.current) supabase.removeChannel(channelRef.current); fetchConversations(); }} className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
+            <button
+              onClick={() => { setActiveChat(null); if (channelRef.current) supabase.removeChannel(channelRef.current); fetchConversations(); }}
+              className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center"
+            >
               <ArrowLeft className="w-4 h-4 text-secondary" />
             </button>
             <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-sm">
               {activeChat.avatar}
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-secondary font-semibold text-sm">{activeChat.full_name}</p>
               <p className="text-secondary/50 text-[10px]">Active</p>
             </div>
+
+            {/* 3-dot menu in chat header */}
+            <div className="relative" ref={chatMenuRef}>
+              <button
+                onClick={() => setShowChatMenu(prev => !prev)}
+                className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors"
+              >
+                <MoreVertical className="w-4 h-4 text-secondary" />
+              </button>
+              {showChatMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="absolute right-0 top-10 z-50 bg-card border border-border/50 rounded-2xl shadow-luxury overflow-hidden min-w-[160px]"
+                >
+                  <button
+                    onClick={() => { setShowChatMenu(false); setShowReportDialog(true); }}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Flag className="w-4 h-4 text-orange-500" /> Report User
+                  </button>
+                  <button
+                    onClick={() => { setShowChatMenu(false); setShowBlockDialog(true); }}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50/50 transition-colors"
+                  >
+                    <Ban className="w-4 h-4" /> Block User
+                  </button>
+                </motion.div>
+              )}
+            </div>
           </div>
 
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
             {messages.length === 0 && (
               <p className="text-center text-muted-foreground text-sm py-8">Start the conversation! 👋</p>
@@ -271,6 +365,7 @@ const Chat = () => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Message Input */}
           <div className="px-4 pb-4 flex gap-2">
             <input
               value={message}
@@ -284,6 +379,78 @@ const Chat = () => {
             </button>
           </div>
         </div>
+
+        {/* Report User Dialog */}
+        <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+          <DialogContent className="max-w-sm mx-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg flex items-center gap-2">
+                <Flag className="w-5 h-5 text-orange-500" /> Report User
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">Please select a reason for reporting <span className="font-semibold text-foreground">{activeChat.full_name}</span>:</p>
+              {[
+                "Spam or scam",
+                "Harassment or abuse",
+                "Fake account",
+                "Inappropriate content",
+                "Fraud or cheating",
+                "Other",
+              ].map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => setReportReason(reason)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-sm border transition-all duration-200 ${reportReason === reason ? "border-orange-400 bg-orange-50/50 text-orange-700 font-semibold" : "border-border/50 text-foreground hover:bg-muted"}`}
+                >
+                  {reason}
+                </button>
+              ))}
+              <button
+                onClick={handleReportUser}
+                disabled={!reportReason || reportSubmitting}
+                className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200 mt-2"
+              >
+                <Flag className="w-4 h-4" /> {reportSubmitting ? "Submitting..." : "Submit Report"}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Block User Dialog */}
+        <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+          <DialogContent className="max-w-sm mx-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg flex items-center gap-2">
+                <Ban className="w-5 h-5 text-red-500" /> Block User
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to block <span className="font-semibold text-foreground">{activeChat.full_name}</span>?
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc">
+                <li>They won't be able to message you</li>
+                <li>You won't see their listings</li>
+                <li>You can unblock them from your settings</li>
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBlockDialog(false)}
+                  className="flex-1 py-2.5 glass-card border border-border/50 text-foreground rounded-xl font-semibold text-sm hover:bg-muted transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBlockUser}
+                  className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <Ban className="w-4 h-4" /> Block
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </AppLayout>
     );
   }

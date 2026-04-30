@@ -32,6 +32,8 @@ const Sell = () => {
   const [deliveryCharge, setDeliveryCharge] = useState("");
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
+  const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [oldPrice, setOldPrice] = useState<number | null>(null);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -99,6 +101,23 @@ const Sell = () => {
 
       if (insertError) throw insertError;
 
+      // Price drop alert — notify wishlist users if price dropped
+      if (editProductId && oldPrice !== null && parseInt(price) < oldPrice) {
+        const { data: wishlistUsers } = await supabase
+          .from("wishlist")
+          .select("user_id")
+          .eq("product_id", editProductId);
+        if (wishlistUsers && wishlistUsers.length > 0) {
+          const notifications = wishlistUsers.map((w: any) => ({
+            user_id: w.user_id,
+            type: "price_drop",
+            title: "💸 Price Drop Alert!",
+            message: `"${title}" ki price ₹${oldPrice.toLocaleString("en-IN")} se ghatkar ₹${parseInt(price).toLocaleString("en-IN")} ho gayi!`,
+            is_read: false,
+          }));
+          await supabase.from("notifications").insert(notifications);
+        }
+      }
       toast.success("Product listed successfully! 🎉");
       navigate("/profile");
     } catch (err: any) {

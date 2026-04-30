@@ -1,7 +1,7 @@
-import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import PromoteModal from "@/components/PromoteModal";
 import SellerReviews from "@/components/SellerReviews";
@@ -34,6 +34,28 @@ const ProductDetail = () => {
   const [offerPrice, setOfferPrice] = useState("");
   const [showPromote, setShowPromote] = useState(false);
 
+  // Similar items state
+  const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+
+  // Report/Block states
+  const [showSellerMenu, setShowSellerMenu] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const sellerMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close seller menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sellerMenuRef.current && !sellerMenuRef.current.contains(e.target as Node)) {
+        setShowSellerMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
@@ -48,6 +70,16 @@ const ProductDetail = () => {
         if (user) {
           const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
           setInWishlist(!!wl);
+        }
+        // Fetch similar items — same category, exclude current product
+        if (data.category) {
+          const { data: similar } = await supabase
+            .from("products")
+            .select("id, title, price, images")
+            .eq("category", data.category)
+            .neq("id", id)
+            .limit(6);
+          setSimilarProducts(similar || []);
         }
       } else {
         toast.error("Product not found");
@@ -117,7 +149,6 @@ const ProductDetail = () => {
     toast.success(`Offer of ₹${offer.toLocaleString("en-IN")} sent to ${sellerName}! 🎉`);
     setShowOfferDialog(false);
     setOfferPrice("");
-    // Navigate to chat with offer message
     navigate(`/chat?seller_id=${product.user_id}&product_id=${product.id}&offer=${offer}`);
   };
 
@@ -132,6 +163,13 @@ const ProductDetail = () => {
     }
   };
 
+  const handleShareWhatsApp = () => {
+    const url = window.location.href;
+    const text = `🛍️ *${product?.title}* — MadFod pe sirf ₹${product?.price?.toLocaleString("en-IN")} mein!\n\n${product?.description ? product.description.substring(0, 100) + "...\n\n" : ""}👉 ${url}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
   const handleDelete = async () => {
     if (!product || !user || product.user_id !== user.id) return;
     const confirmed = window.confirm("Are you sure you want to delete this listing?");
@@ -140,6 +178,45 @@ const ProductDetail = () => {
     if (error) { toast.error("Failed to delete listing"); return; }
     toast.success("Listing deleted successfully! 🗑️");
     navigate("/profile");
+  };
+
+  // Report seller
+  const handleReportSeller = async () => {
+    if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    if (!reportReason.trim()) { toast.error("Please select a reason"); return; }
+    setReportSubmitting(true);
+    try {
+      await supabase.from("reports").insert({
+        reporter_id: user.id,
+        reported_user_id: product.user_id,
+        product_id: product.id,
+        reason: reportReason,
+        type: "seller",
+      });
+      toast.success("Report submitted. We'll review it shortly. 🙏");
+      setShowReportDialog(false);
+      setReportReason("");
+    } catch {
+      toast.error("Failed to submit report. Please try again.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  // Block seller
+  const handleBlockSeller = async () => {
+    if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    try {
+      await supabase.from("blocked_users").insert({
+        blocker_id: user.id,
+        blocked_id: product.user_id,
+      });
+      toast.success(`${sellerName} has been blocked. You won't see their listings anymore.`);
+      setShowBlockDialog(false);
+      navigate("/");
+    } catch {
+      toast.error("Failed to block user. Please try again.");
+    }
   };
 
   if (loading) return <AppLayout><div className="min-h-screen flex items-center justify-center"><div className="text-secondary font-semibold">Loading...</div></div></AppLayout>;
@@ -152,69 +229,54 @@ const ProductDetail = () => {
       <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:px-2 lg:py-6">
         {/* Image Section with Carousel */}
         <div className="relative">
-          <div className="absolute top-4 left-4 z-10 lg:hidden">
-            <button onClick={() => navigate(-1)} className="w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card"><ArrowLeft className="w-5 h-5 text-foreground" /></button>
-          </div>
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
-            <button onClick={(e) => { e.stopPropagation(); handleShare(); }} className="w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card"><Share2 className="w-4 h-4 text-foreground" /></button>
-            <button onClick={toggleWishlist} className="w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card">
-              <Heart className={`w-5 h-5 ${inWishlist ? "text-destructive fill-destructive" : "text-secondary"}`} />
-            </button>
-            {user && product?.user_id === user.id && (
-              <button onClick={handleDelete} className="w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card"><Trash2 className="w-4 h-4 text-destructive" /></button>
-            )}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="bg-muted/30 flex items-center justify-center py-8 lg:rounded-2xl lg:overflow-hidden relative cursor-pointer"
-            onClick={() => setLightboxOpen(true)}
-          >
-            <img src={images[currentImageIndex]} alt={product.title} className="h-64 md:h-80 lg:h-[28rem] object-contain" />
-          </motion.div>
-
-          {/* Prev/Next Arrows */}
-          {totalImages > 1 && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); goToPrev(); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card z-10 hover:bg-card transition-colors">
-                <ChevronLeft className="w-5 h-5 text-foreground" />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); goToNext(); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 glass-card rounded-full flex items-center justify-center shadow-card z-10 hover:bg-card transition-colors">
-                <ChevronRight className="w-5 h-5 text-foreground" />
-              </button>
-            </>
-          )}
-
-          {/* Dots */}
-          {totalImages > 1 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {images.map((_: string, i: number) => (
-                <button key={i} onClick={() => setCurrentImageIndex(i)} className={`w-2.5 h-2.5 rounded-full transition-all ${i === currentImageIndex ? "bg-secondary scale-125" : "bg-muted-foreground/30"}`} />
-              ))}
-            </div>
-          )}
-
-          {/* Thumbnails */}
-          {totalImages > 1 && (
-            <div className="flex gap-2 mt-3 px-4 lg:px-0 overflow-x-auto">
-              {images.map((img: string, i: number) => (
-                <button key={i} onClick={() => setCurrentImageIndex(i)}
-                  className={`w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${i === currentImageIndex ? "border-secondary shadow-card" : "border-border/30 opacity-60 hover:opacity-100"}`}
-                >
-                  <img src={img} alt={`${product.title} ${i + 1}`} className="w-full h-full object-cover" />
+          <div className="relative aspect-square md:aspect-[4/3] overflow-hidden rounded-b-3xl lg:rounded-3xl bg-muted">
+            <img
+              src={images[currentImageIndex]}
+              alt={product.title}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
+            />
+            {totalImages > 1 && (
+              <>
+                <button onClick={goToPrev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-10">
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
-              ))}
+                <button onClick={goToNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-10">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {images.map((_: any, idx: number) => (
+                    <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentImageIndex ? "bg-white w-4" : "bg-white/50"}`} />
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="absolute top-3 left-3 flex gap-2 z-10">
+              <button onClick={() => navigate(-1)} className="w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
             </div>
-          )}
+            <div className="absolute top-3 right-3 flex gap-2 z-10">
+              <button onClick={handleShare} className="w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
+                <Share2 className="w-4 h-4" />
+              </button>
+              <button onClick={toggleWishlist} className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${inWishlist ? "bg-red-500 text-white" : "bg-black/30 text-white hover:bg-black/50"}`}>
+                <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
+              </button>
+              {user && product?.user_id === user.id && (
+                <button onClick={handleDelete} className="w-9 h-9 bg-red-500/80 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Product Info */}
-        <div className="px-4 pt-4 lg:px-0">
-          <button onClick={() => navigate(-1)} className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"><ArrowLeft className="w-4 h-4" /> Back to listings</button>
-          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground font-serif">{product.title}</h1>
-          <p className="text-xs md:text-sm text-muted-foreground">{product.category}</p>
-          <div className="flex items-center gap-2 mt-2 mb-3">
-            <span className="text-xl md:text-2xl font-extrabold text-secondary">₹{product.price.toLocaleString("en-IN")}</span>
+        <div className="px-4 md:px-0 py-4 md:py-0">
+          <h1 className="text-lg md:text-2xl font-bold text-foreground font-serif mb-1">{product.title}</h1>
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <span className="text-2xl md:text-3xl font-extrabold text-secondary">₹{product.price.toLocaleString("en-IN")}</span>
             {product.original_price && (
               <>
                 <span className="text-sm text-muted-foreground line-through">₹{product.original_price.toLocaleString("en-IN")}</span>
@@ -232,6 +294,7 @@ const ProductDetail = () => {
             <span>{product.condition}</span>
             {product.size && <><span>•</span><span>Size: {product.size}</span></>}
           </div>
+
           {/* Delivery Info */}
           {(product as any)?.delivery_available && (
             <div className="flex items-center gap-2 mb-3 bg-emerald-50/50 rounded-xl px-3 py-2 border border-emerald-200/50">
@@ -250,15 +313,56 @@ const ProductDetail = () => {
               <p className="text-xs md:text-sm text-muted-foreground">{product.description}</p>
             </div>
           )}
+
+          {/* Seller Card with Report/Block menu */}
           <div className="glass-card rounded-2xl p-3 md:p-4 shadow-card border border-border/30 flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">{sellerName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}</div>
+              <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">
+                {sellerName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+              </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">{sellerName}</p>
-                <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1">{sellerIsVerified ? <><BadgeCheck className="w-3 h-3 text-emerald-500" /><span className="text-emerald-600 font-semibold">Verified Seller</span></> : <><Shield className="w-3 h-3 text-secondary" /> Seller</>}</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1">
+                  {sellerIsVerified
+                    ? <><BadgeCheck className="w-3 h-3 text-emerald-500" /><span className="text-emerald-600 font-semibold">Verified Seller</span></>
+                    : <><Shield className="w-3 h-3 text-secondary" /> Seller</>}
+                </p>
               </div>
             </div>
+
+            {/* 3-dot menu — only show if viewer is NOT the seller */}
+            {user && product?.user_id !== user.id && (
+              <div className="relative" ref={sellerMenuRef}>
+                <button
+                  onClick={() => setShowSellerMenu(prev => !prev)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                >
+                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                </button>
+                {showSellerMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className="absolute right-0 top-10 z-50 bg-card border border-border/50 rounded-2xl shadow-luxury overflow-hidden min-w-[160px]"
+                  >
+                    <button
+                      onClick={() => { setShowSellerMenu(false); if (!user) { toast.error("Please login first"); navigate("/login"); return; } setShowReportDialog(true); }}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Flag className="w-4 h-4 text-orange-500" /> Report Seller
+                    </button>
+                    <button
+                      onClick={() => { setShowSellerMenu(false); if (!user) { toast.error("Please login first"); navigate("/login"); return; } setShowBlockDialog(true); }}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50/50 transition-colors"
+                    >
+                      <Ban className="w-4 h-4" /> Block Seller
+                    </button>
+                  </motion.div>
+                )}
+              </div>
+            )}
           </div>
+
           <div className="flex gap-2 mb-2">
             <button onClick={() => navigate(`/chat?seller_id=${product.user_id}&product_id=${product.id}`)} className="flex-1 py-3 glass-card border-2 border-primary text-primary rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-card hover:bg-primary/5 transition-all duration-200">
               <MessageCircle className="w-4 h-4" /> Chat
@@ -282,6 +386,21 @@ const ProductDetail = () => {
             </button>
           </div>
 
+          {/* WhatsApp Share Button */}
+          <div className="mb-6">
+            <button
+              onClick={handleShareWhatsApp}
+              className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-90"
+              style={{ backgroundColor: "#25D366", color: "#fff" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.555 4.122 1.528 5.856L.057 23.882a.5.5 0 0 0 .611.611l6.056-1.479A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.67-.523-5.193-1.434l-.372-.215-3.853.94.972-3.756-.234-.389A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+              </svg>
+              Share on WhatsApp
+            </button>
+          </div>
+
           {/* Seller Reviews */}
           {product && (
             <SellerReviews
@@ -294,6 +413,36 @@ const ProductDetail = () => {
           )}
         </div>
       </div>
+
+      {/* Similar Items */}
+      {similarProducts.length > 0 && (
+        <div className="px-4 md:px-6 py-4">
+          <h2 className="text-base font-bold text-foreground font-serif mb-3">Similar Items ✨</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {similarProducts.map((item) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => navigate(`/product/${item.id}`)}
+                className="glass-card rounded-2xl overflow-hidden border border-border/30 shadow-card cursor-pointer hover:shadow-luxury transition-all duration-300"
+              >
+                <div className="aspect-square bg-muted overflow-hidden">
+                  <img
+                    src={item.images?.[0] || "/placeholder.svg"}
+                    alt={item.title}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+                <div className="p-2">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                  <p className="text-xs font-bold text-secondary">₹{item.price?.toLocaleString("en-IN")}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Make Offer Dialog */}
       <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
@@ -326,6 +475,78 @@ const ProductDetail = () => {
               <Send className="w-4 h-4" /> Send Offer
             </button>
             <p className="text-[10px] text-muted-foreground text-center">The seller will be notified of your offer via chat</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Seller Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <Flag className="w-5 h-5 text-orange-500" /> Report Seller
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-muted-foreground">Please select a reason for reporting <span className="font-semibold text-foreground">{sellerName}</span>:</p>
+            {[
+              "Fake or misleading listing",
+              "Spam or scam",
+              "Inappropriate content",
+              "Counterfeit / fake product",
+              "Harassment or abuse",
+              "Other",
+            ].map((reason) => (
+              <button
+                key={reason}
+                onClick={() => setReportReason(reason)}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm border transition-all duration-200 ${reportReason === reason ? "border-orange-400 bg-orange-50/50 text-orange-700 font-semibold" : "border-border/50 text-foreground hover:bg-muted"}`}
+              >
+                {reason}
+              </button>
+            ))}
+            <button
+              onClick={handleReportSeller}
+              disabled={!reportReason || reportSubmitting}
+              className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200 mt-2"
+            >
+              <Flag className="w-4 h-4" /> {reportSubmitting ? "Submitting..." : "Submit Report"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Block Seller Dialog */}
+      <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <Ban className="w-5 h-5 text-red-500" /> Block Seller
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to block <span className="font-semibold text-foreground">{sellerName}</span>?
+            </p>
+            <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc">
+              <li>You won't see their listings anymore</li>
+              <li>They won't be able to message you</li>
+              <li>You can unblock them from your settings</li>
+            </ul>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBlockDialog(false)}
+                className="flex-1 py-2.5 glass-card border border-border/50 text-foreground rounded-xl font-semibold text-sm hover:bg-muted transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockSeller}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <Ban className="w-4 h-4" /> Block
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

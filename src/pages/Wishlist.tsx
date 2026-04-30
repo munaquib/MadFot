@@ -81,9 +81,14 @@ const Wishlist = () => {
                 </div>
                 <div className="p-2.5 md:p-3">
                   <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.products?.title}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <p className="text-sm md:text-base font-extrabold text-secondary">₹{item.products?.price?.toLocaleString()}</p>
                     {item.products?.original_price && <p className="text-[10px] md:text-xs text-muted-foreground line-through">₹{item.products.original_price.toLocaleString()}</p>}
+                    {item.products?.original_price && item.products.price < item.products.original_price && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                        💸 Price Drop!
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-muted-foreground">
                     <MapPin className="w-2.5 h-2.5" /><span className="text-[10px] md:text-xs">{item.products?.location}</span>
