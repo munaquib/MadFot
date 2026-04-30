@@ -232,11 +232,11 @@ const ProductDetail = () => {
       <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:px-2 lg:py-6">
         {/* Image Section with Carousel */}
         <div className="relative">
-          <div className="relative aspect-square md:aspect-[4/3] overflow-hidden rounded-b-3xl lg:rounded-3xl bg-muted">
+          <div className="relative aspect-[3/4] md:aspect-square overflow-hidden rounded-b-3xl lg:rounded-3xl bg-muted">
             <img
               src={images[currentImageIndex]}
               alt={product.title}
-              className="w-full h-full object-cover cursor-pointer"
+              className="w-full h-full object-contain cursor-pointer bg-muted"
               onClick={() => setLightboxOpen(true)}
             />
             {totalImages > 1 && (
