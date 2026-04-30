@@ -258,12 +258,12 @@ const Index = () => {
           {/* Header */}
           <div className="bg-primary px-5 py-4">
             <h2 className="text-secondary font-bold text-lg font-serif">About MadFod</h2>
-            <p className="text-secondary/60 text-xs mt-0.5">India's Premium Pre-Loved Fashion Marketplace</p>
+            <p className="text-secondary/60 text-xs mt-0.5">India ka Premium Pre-Loved Fashion Marketplace</p>
           </div>
           {/* Content */}
           <div className="p-5 space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              <span className="font-bold text-foreground">MadFod</span> is India's trusted marketplace for pre-loved ethnic and luxury fashion — lehengas, sherwanis, sarees, gowns, and much more. We believe premium fashion should be accessible to everyone.
+              <span className="font-bold text-foreground">MadFod</span> ek trusted platform hai jahan aap apne pre-loved ethnic aur luxury fashion — lehenga, sherwani, saree, gown aur bahut kuch — buy aur sell kar sakte hain. Hum believe karte hain ki premium fashion sabke liye accessible hona chahiye.
             </p>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -297,14 +297,14 @@ const Index = () => {
             </div>
             {/* Footer links */}
             <div className="border-t border-border/30 pt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
-              <span className="cursor-pointer hover:text-secondary transition-colors">📋 About Us</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">🤝 Sell With Us</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">🔒 Privacy Policy</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">📞 Contact Us</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">↩️ Returns Policy</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">💳 Payment Info</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">❓ Help & FAQ</span>
-              <span className="cursor-pointer hover:text-secondary transition-colors">📱 Download App</span>
+              <span onClick={() => navigate("/about")} className="cursor-pointer hover:text-secondary transition-colors">📋 About Us</span>
+              <span onClick={() => navigate("/sell-with-us")} className="cursor-pointer hover:text-secondary transition-colors">🤝 Sell With Us</span>
+              <span onClick={() => navigate("/privacy-policy")} className="cursor-pointer hover:text-secondary transition-colors">🔒 Privacy Policy</span>
+              <span onClick={() => navigate("/contact")} className="cursor-pointer hover:text-secondary transition-colors">📞 Contact Us</span>
+              <span onClick={() => navigate("/returns-policy")} className="cursor-pointer hover:text-secondary transition-colors">↩️ Returns Policy</span>
+              <span onClick={() => navigate("/payment-info")} className="cursor-pointer hover:text-secondary transition-colors">💳 Payment Info</span>
+              <span onClick={() => navigate("/help")} className="cursor-pointer hover:text-secondary transition-colors">❓ Help & FAQ</span>
+              <span onClick={() => navigate("/sell")} className="cursor-pointer hover:text-secondary transition-colors">📱 Download App</span>
             </div>
             <p className="text-center text-[10px] text-muted-foreground pt-1">© 2026 MadFod. All rights reserved. Made with ❤️ in India</p>
           </div>

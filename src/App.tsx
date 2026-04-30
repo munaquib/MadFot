@@ -27,6 +27,12 @@ import EditProfile from "./pages/EditProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 import MyAds from "./pages/MyAds";
 import NotFound from "./pages/NotFound";
+import AboutUs from "./pages/AboutUs";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ContactUs from "./pages/ContactUs";
+import ReturnsPolicy from "./pages/ReturnsPolicy";
+import PaymentInfo from "./pages/PaymentInfo";
+import SellWithUs from "./pages/SellWithUs";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +83,12 @@ const App = () => (
                 <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/my-ads" element={<ProtectedRoute><MyAds /></ProtectedRoute>} />
+                <Route path="/about" element={<AboutUs />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/contact" element={<ContactUs />} />
+                <Route path="/returns-policy" element={<ReturnsPolicy />} />
+                <Route path="/payment-info" element={<PaymentInfo />} />
+                <Route path="/sell-with-us" element={<SellWithUs />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AuthProvider>
