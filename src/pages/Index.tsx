@@ -258,12 +258,12 @@ const Index = () => {
           {/* Header */}
           <div className="bg-primary px-5 py-4">
             <h2 className="text-secondary font-bold text-lg font-serif">About MadFod</h2>
-            <p className="text-secondary/60 text-xs mt-0.5">India ka Premium Pre-Loved Fashion Marketplace</p>
+            <p className="text-secondary/60 text-xs mt-0.5">India's Premium Pre-Loved Fashion Marketplace</p>
           </div>
           {/* Content */}
           <div className="p-5 space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              <span className="font-bold text-foreground">MadFod</span> ek trusted platform hai jahan aap apne pre-loved ethnic aur luxury fashion — lehenga, sherwani, saree, gown aur bahut kuch — buy aur sell kar sakte hain. Hum believe karte hain ki premium fashion sabke liye accessible hona chahiye.
+              <span className="font-bold text-foreground">MadFod</span> is India's trusted marketplace for pre-loved ethnic and luxury fashion — lehengas, sherwanis, sarees, gowns, and much more. We believe premium fashion should be accessible to everyone.
             </p>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -304,7 +304,7 @@ const Index = () => {
               <span onClick={() => navigate("/returns-policy")} className="cursor-pointer hover:text-secondary transition-colors">↩️ Returns Policy</span>
               <span onClick={() => navigate("/payment-info")} className="cursor-pointer hover:text-secondary transition-colors">💳 Payment Info</span>
               <span onClick={() => navigate("/help")} className="cursor-pointer hover:text-secondary transition-colors">❓ Help & FAQ</span>
-              <span onClick={() => navigate("/sell")} className="cursor-pointer hover:text-secondary transition-colors">📱 Download App</span>
+              <span onClick={() => window.open("https://play.google.com/store", "_blank")} className="cursor-pointer hover:text-secondary transition-colors">📱 Download App</span>
             </div>
             <p className="text-center text-[10px] text-muted-foreground pt-1">© 2026 MadFod. All rights reserved. Made with ❤️ in India</p>
           </div>
