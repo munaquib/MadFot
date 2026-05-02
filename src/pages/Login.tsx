@@ -12,8 +12,13 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
+
+  // If already logged in, redirect to home
+  useEffect(() => {
+    if (user) navigate("/");
+  }, [user]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
