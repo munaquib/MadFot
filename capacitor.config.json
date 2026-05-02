@@ -1,5 +1,5 @@
 {
-  "appId": "com.MadFod.app",
+  "appId": "com.madfod.app",
   "appName": "MadFod",
   "webDir": "dist",
   "server": {
@@ -10,7 +10,10 @@
   },
   "plugins": {
     "GoogleAuth": {
-      "scopes": ["profile", "email"],
+      "scopes": [
+        "profile",
+        "email"
+      ],
       "serverClientId": "618115455469-dngo03b6681obtl2b5nvprvhfpbfglln.apps.googleusercontent.com",
       "forceCodeForRefreshToken": true
     }
