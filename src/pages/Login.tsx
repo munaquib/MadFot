@@ -39,12 +39,12 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     setLoading(true);
     const { error } = await signInWithGoogle();
-    setLoading(false);
     if (error) {
+      setLoading(false);
       toast.error(error.message || "Google login failed");
-    } else {
-      navigate("/"); // ✅ Fix: Google login ke baad navigate karo
     }
+    // OAuth redirect hoga automatically — navigate() mat karo
+    // setLoading(false) nahi karo — page redirect ho jaayega
   };
 
   // =====================
