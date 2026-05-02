@@ -47,11 +47,27 @@ const NotificationSetup = () => {
   return null;
 };
 
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--gradient-bg)" }}>
+    <div className="text-primary font-semibold">Loading...</div>
+  </div>
+);
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--gradient-bg)" }}><div className="text-primary font-semibold">Loading...</div></div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" />;
   return <>{children}</>;
+};
+
+// Home page bhi OAuth redirect ke dauran loading dikhaye
+const HomeRoute = () => {
+  const { loading } = useAuth();
+  // Check if this is an OAuth redirect
+  const isOAuthRedirect = window.location.hash.includes("access_token") ||
+                          window.location.search.includes("code=");
+  if (loading && isOAuthRedirect) return <LoadingScreen />;
+  return <Index />;
 };
 
 const App = () => (
@@ -67,7 +83,7 @@ const App = () => (
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<HomeRoute />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
