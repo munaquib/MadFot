@@ -34,32 +34,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
 
-    // Only load cached session if NOT redirecting from Google OAuth
-    try {
-      const isLoginPage = window.location.pathname === "/login";
-      const isOAuthRedirect = window.location.hash.includes("access_token") || 
-                              window.location.search.includes("code=");
-      
-      if (!isLoginPage && !isOAuthRedirect) {
-        const cached = localStorage.getItem("madfod_session");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed?.user) {
-            setUser(parsed.user);
-            setSession(parsed);
-            setLoading(false);
+    // Check if user just clicked Google login
+    const googleLoginPending = localStorage.getItem("google_login_pending") === "true";
+
+    if (googleLoginPending) {
+      // Don't load cached session — keep loading=true until Supabase confirms
+      localStorage.removeItem("madfod_session");
+    } else {
+      // Normal load — use cached session for fast load
+      try {
+        const isLoginPage = window.location.pathname === "/login";
+        if (!isLoginPage) {
+          const cached = localStorage.getItem("madfod_session");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed?.user) {
+              setUser(parsed.user);
+              setSession(parsed);
+              setLoading(false);
+            }
           }
         }
-      }
-      
-      // If it's an OAuth redirect, clear cache and keep loading=true
-      if (isOAuthRedirect) {
-        localStorage.removeItem("madfod_session");
-        setLoading(true);
-      }
-    } catch {}
+      } catch {}
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      localStorage.removeItem("google_login_pending");
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -73,6 +73,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      localStorage.removeItem("google_login_pending");
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -108,29 +109,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const googleUser = await GoogleAuth.signIn();
         const idToken = googleUser.authentication.idToken;
         const accessToken = googleUser.authentication.accessToken;
-
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: "google",
           token: idToken,
           access_token: accessToken,
         });
-
         if (data?.session) {
           setSession(data.session);
           setUser(data.session.user);
         }
-
         return { error };
       } catch (error) {
         return { error };
       }
     }
 
-    // Clear cache + set loading=true so home page doesn't flash
-    try { localStorage.removeItem("madfod_session"); } catch {}
-    setLoading(true);
-    setUser(null);
-    setSession(null);
+    // Set flag BEFORE redirect — page reload ke baad loading=true rahega
+    localStorage.setItem("google_login_pending", "true");
+    localStorage.removeItem("madfod_session");
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -161,7 +157,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    try { localStorage.removeItem("madfod_session"); } catch {}
+    try {
+      localStorage.removeItem("madfod_session");
+      localStorage.removeItem("google_login_pending");
+    } catch {}
     await supabase.auth.signOut();
     if (Capacitor.isNativePlatform()) {
       await GoogleAuth.signOut();
