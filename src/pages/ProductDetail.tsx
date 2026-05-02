@@ -166,7 +166,7 @@ const ProductDetail = () => {
   const handleShareWhatsApp = () => {
     const rawUrl = window.location.href;
     const url = rawUrl.includes("localhost")
-      ? `https://mad-fod.vercel.app/product/${product?.id}`
+      ? `https://madfod.com/product/${product?.id}`
       : rawUrl;
     const text = `🛍️ *${product?.title}* — MadFod pe sirf ₹${product?.price?.toLocaleString("en-IN")} mein!\n\n${product?.description ? product.description.substring(0, 100) + "...\n\n" : ""}👉 ${url}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;

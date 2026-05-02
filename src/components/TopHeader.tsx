@@ -88,36 +88,36 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
             <h1 className="text-lg font-extrabold text-secondary font-serif block">MadFod</h1>
           </div>
 
-          {/* Search Bar — full width, longer */}
-          <div className="relative flex-1 mx-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Search..."
-              className="w-full bg-card rounded-lg py-2 pl-9 pr-20 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-            />
-            <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (onFilterClick) {
-                    onFilterClick();
-                    return;
-                  }
-                  navigate("/search");
-                }}
-                aria-label="Open filters"
-                className="flex items-center gap-1 bg-secondary text-primary text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                Filter
-              </button>
+          {/* Search Bar — connected with Filter button */}
+          <div className="flex flex-1 mx-auto rounded-lg overflow-hidden">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                placeholder="Search..."
+                className="w-full bg-card py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
             </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onFilterClick) {
+                  onFilterClick();
+                  return;
+                }
+                navigate("/search");
+              }}
+              aria-label="Open filters"
+              className="flex items-center gap-1.5 bg-secondary text-primary text-[11px] font-bold px-3 py-2 hover:opacity-90 transition-opacity shrink-0"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Filter
+            </button>
           </div>
 
           {/* Location */}

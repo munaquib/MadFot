@@ -114,6 +114,15 @@ const Index = () => {
                 <input type="range" min="1000" max="200000" step="1000" value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   className="w-full accent-yellow-600" />
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                min="1000"
+                max="200000"
+                placeholder="Enter max price"
+                className="mt-2 w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              />
               </div>
 
               <button
@@ -252,6 +261,8 @@ const Index = () => {
         )}
       </div>
 
+      <WhyBuyPreLoved />
+
       {/* About Section */}
       <div className="px-4 md:px-6 mt-8 mb-4">
         <div className="glass-card rounded-2xl border border-border/30 shadow-card overflow-hidden">
@@ -311,7 +322,6 @@ const Index = () => {
         </div>
       </div>
 
-      <WhyBuyPreLoved />
     </AppLayout>
   );
 };
