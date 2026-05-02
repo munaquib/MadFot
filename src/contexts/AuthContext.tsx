@@ -35,14 +35,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // Load cached session instantly so app opens fast
+    // But only if we are NOT on the login page
     try {
-      const cached = localStorage.getItem("madfod_session");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.user) {
-          setUser(parsed.user);
-          setSession(parsed);
-          setLoading(false);
+      const isLoginPage = window.location.pathname === "/login";
+      if (!isLoginPage) {
+        const cached = localStorage.getItem("madfod_session");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.user) {
+            setUser(parsed.user);
+            setSession(parsed);
+            setLoading(false);
+          }
         }
       }
     } catch {}
@@ -120,7 +124,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: "https://madfod.com/",
         queryParams: {
           prompt: "select_account",
         },
