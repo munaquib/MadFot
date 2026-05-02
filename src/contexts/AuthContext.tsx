@@ -34,14 +34,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
 
-    // Check if user just clicked Google login
-    const googleLoginPending = localStorage.getItem("google_login_pending") === "true";
+    // sessionStorage use karo — redirect ke baad bhi same tab mein rehta hai
+    const googleLoginPending = sessionStorage.getItem("google_login_pending") === "true";
 
     if (googleLoginPending) {
-      // Don't load cached session — keep loading=true until Supabase confirms
       localStorage.removeItem("madfod_session");
     } else {
-      // Normal load — use cached session for fast load
       try {
         const isLoginPage = window.location.pathname === "/login";
         if (!isLoginPage) {
@@ -59,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      localStorage.removeItem("google_login_pending");
+      sessionStorage.removeItem("google_login_pending");
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -73,7 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      localStorage.removeItem("google_login_pending");
+      sessionStorage.removeItem("google_login_pending");
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -124,8 +122,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    // Set flag BEFORE redirect — page reload ke baad loading=true rahega
-    localStorage.setItem("google_login_pending", "true");
+    // sessionStorage mein flag lagao — redirect ke baad bhi rahega
+    sessionStorage.setItem("google_login_pending", "true");
     localStorage.removeItem("madfod_session");
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -159,7 +157,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       localStorage.removeItem("madfod_session");
-      localStorage.removeItem("google_login_pending");
+      sessionStorage.removeItem("google_login_pending");
     } catch {}
     await supabase.auth.signOut();
     if (Capacitor.isNativePlatform()) {
