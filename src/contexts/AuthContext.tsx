@@ -115,6 +115,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
+    // Clear cache so home page doesn't flash during Google redirect
+    try { localStorage.removeItem("madfod_session"); } catch {}
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
