@@ -34,11 +34,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
 
-    // Load cached session instantly so app opens fast
-    // But only if we are NOT on the login page
+    // Only load cached session if NOT redirecting from Google OAuth
     try {
       const isLoginPage = window.location.pathname === "/login";
-      if (!isLoginPage) {
+      const isOAuthRedirect = window.location.hash.includes("access_token") || 
+                              window.location.search.includes("code=");
+      
+      if (!isLoginPage && !isOAuthRedirect) {
         const cached = localStorage.getItem("madfod_session");
         if (cached) {
           const parsed = JSON.parse(cached);
@@ -49,13 +51,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       }
+      
+      // If it's an OAuth redirect, clear cache and keep loading=true
+      if (isOAuthRedirect) {
+        localStorage.removeItem("madfod_session");
+        setLoading(true);
+      }
     } catch {}
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      // Cache session for instant load next time
       try {
         if (session) {
           localStorage.setItem("madfod_session", JSON.stringify(session));
@@ -100,12 +107,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const googleUser = await GoogleAuth.signIn();
         const idToken = googleUser.authentication.idToken;
-        const accessToken = googleUser.authentication.accessToken; // ✅ add kiya
+        const accessToken = googleUser.authentication.accessToken;
 
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: "google",
           token: idToken,
-          access_token: accessToken, // ✅ add kiya
+          access_token: accessToken,
         });
 
         if (data?.session) {
@@ -119,8 +126,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    // Clear cache so home page doesn't flash during Google redirect
+    // Clear cache + set loading=true so home page doesn't flash
     try { localStorage.removeItem("madfod_session"); } catch {}
+    setLoading(true);
+    setUser(null);
+    setSession(null);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
