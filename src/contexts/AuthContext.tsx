@@ -29,22 +29,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
         clientId: "618115455469-dngo03b6681obtl2b5nvprvhfpbfglln.apps.googleusercontent.com",
-        
         scopes: ["profile", "email"],
         grantOfflineAccess: true,
       });
     }
 
+    // Load cached session instantly so app opens fast
+    try {
+      const cached = localStorage.getItem("madfod_session");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.user) {
+          setUser(parsed.user);
+          setSession(parsed);
+          setLoading(false);
+        }
+      }
+    } catch {}
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      // Cache session for instant load next time
+      try {
+        if (session) {
+          localStorage.setItem("madfod_session", JSON.stringify(session));
+        } else {
+          localStorage.removeItem("madfod_session");
+        }
+      } catch {}
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      try {
+        if (session) {
+          localStorage.setItem("madfod_session", JSON.stringify(session));
+        } else {
+          localStorage.removeItem("madfod_session");
+        }
+      } catch {}
     });
 
     return () => subscription.unsubscribe();
@@ -114,6 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    try { localStorage.removeItem("madfod_session"); } catch {}
     await supabase.auth.signOut();
     if (Capacitor.isNativePlatform()) {
       await GoogleAuth.signOut();
