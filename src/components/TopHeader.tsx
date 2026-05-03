@@ -372,9 +372,10 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
               Filter
             </button>
           </div>
-          <button onClick={openDrawer} className="flex items-center gap-1 text-secondary/80 hover:text-secondary text-xs bg-secondary/10 px-2.5 py-1.5 rounded-lg transition-colors shrink-0">
-            <MapPin className="w-3 h-3" />
-            <span className="max-w-[100px] truncate">{displayLocation()}</span>
+          <button onClick={openDrawer} className="flex items-center gap-1.5 text-secondary/80 hover:text-secondary text-xs bg-secondary/10 px-3 py-1.5 rounded-lg transition-colors shrink-0">
+            <MapPin className="w-3.5 h-3.5" />
+            <span className="max-w-[160px] truncate">{displayLocation()}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 ml-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
             <button onClick={() => navigate(user ? "/profile" : "/login")} className="flex items-center gap-1 text-secondary/80 hover:text-secondary text-xs px-1.5 py-1.5 rounded-lg transition-colors">
