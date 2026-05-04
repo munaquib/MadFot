@@ -337,6 +337,87 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
         </div>
       )}
 
+      {/* ========== DESKTOP LOCATION DROPDOWN ========== */}
+      {showLocationDrawer && (
+        <div className="hidden lg:block fixed inset-0 z-[100]" onClick={() => { setShowLocationDrawer(false); setDrawerStep("state"); setLocationSearch(""); }}>
+          <div className="absolute bg-card rounded-2xl shadow-2xl border border-border/30 overflow-hidden w-[380px]"
+            style={{ top: "52px", right: "120px" }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div className="flex items-center gap-2">
+                {drawerStep === "city" && (
+                  <button onClick={() => { setDrawerStep("state"); setLocationSearch(""); }}>
+                    <ChevronLeft className="w-5 h-5 text-foreground" />
+                  </button>
+                )}
+                <span className="text-sm font-bold text-foreground">
+                  {drawerStep === "state" ? "Select Location" : `Cities in ${selectedState}`}
+                </span>
+              </div>
+              <button onClick={() => { setShowLocationDrawer(false); setDrawerStep("state"); setLocationSearch(""); }} className="text-muted-foreground font-bold text-lg">✕</button>
+            </div>
+            <div className="px-4 pt-3 pb-2 max-h-[420px] overflow-y-auto">
+              {/* Search */}
+              <div className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2 mb-3">
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                <input type="text" value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder={drawerStep === "state" ? "Search state..." : "Search city..."}
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none" />
+              </div>
+              {/* STATE STEP */}
+              {drawerStep === "state" && (
+                <>
+                  <div className="flex items-center gap-3 py-2 cursor-pointer border-b border-border/20 mb-2"
+                    onClick={() => { refreshLocation(); setShowLocationDrawer(false); setLocationSearch(""); setDrawerStep("state"); }}>
+                    <MapPin className="w-4 h-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-bold text-primary">Use current location</p>
+                      <p className="text-xs text-muted-foreground">Enable Location</p>
+                    </div>
+                  </div>
+                  {recentlyUsed && !locationSearch && (
+                    <div className="border-b border-border/30 mb-2 pb-2">
+                      <p className="text-xs text-muted-foreground font-semibold mb-1">RECENTLY USED</p>
+                      <button onClick={() => {
+                        const parts = recentlyUsed.split(", ");
+                        setCity(parts[0]); setState(parts[1] || "");
+                        try { localStorage.setItem("madfod_city", parts[0]); localStorage.setItem("madfod_state", parts[1] || ""); } catch {}
+                        setShowLocationDrawer(false); setLocationSearch("");
+                      }} className="flex items-center gap-3 w-full py-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm text-foreground">{recentlyUsed}</span>
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground font-semibold mb-1">CHOOSE STATE</p>
+                  {indianStates.filter(s => !locationSearch || s.toLowerCase().includes(locationSearch.toLowerCase())).map((s) => (
+                    <button key={s} onClick={() => handleStateSelect(s)}
+                      className="flex items-center justify-between w-full py-2.5 border-b border-border/20 text-sm text-foreground hover:text-primary transition-colors">
+                      <span className={s === "All in India" ? "text-primary font-semibold" : ""}>{s}</span>
+                      {s !== "All in India" && <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>}
+                    </button>
+                  ))}
+                </>
+              )}
+              {/* CITY STEP */}
+              {drawerStep === "city" && (
+                <>
+                  <p className="text-xs text-muted-foreground font-semibold mb-1">CHOOSE CITY</p>
+                  {(stateCities[selectedState] || []).filter(c => !locationSearch || c.toLowerCase().includes(locationSearch.toLowerCase())).map((c) => (
+                    <button key={c} onClick={() => handleCitySelect(c)}
+                      className="flex items-center justify-between w-full py-2.5 border-b border-border/20 text-sm text-foreground hover:text-primary transition-colors">
+                      <span>{c}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========== DESKTOP HEADER ========== */}
       <div className="hidden lg:block bg-primary px-4 py-2.5">
         <div className="max-w-[1300px] mx-auto flex items-center gap-3">
