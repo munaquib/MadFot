@@ -39,25 +39,56 @@ const Index = () => {
   const [selectedCondition, setSelectedCondition] = useState("All");
   const [maxPrice, setMaxPrice] = useState(100000);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const { data: featured } = await supabase
-        .from("products")
-        .select("*")
-        .eq("status", "active")
-        .order("views_count", { ascending: false })
-        .limit(4);
-      setFeaturedItems(featured || []);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [avgRating, setAvgRating] = useState("—");
 
-      const { data: recent } = await supabase
-        .from("products")
-        .select("*")
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      setRecentlyAdded(recent || []);
-    };
+  const fetchProducts = async () => {
+    const { data: featured } = await supabase
+      .from("products")
+      .select("*")
+      .eq("status", "active")
+      .order("views_count", { ascending: false })
+      .limit(4);
+    setFeaturedItems(featured || []);
+
+    const { data: recent } = await supabase
+      .from("products")
+      .select("*")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(3);
+    setRecentlyAdded(recent || []);
+
+    // Real stats
+    const { count } = await supabase
+      .from("products")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active");
+    setTotalProducts(count || 0);
+
+    const { data: ratings } = await supabase
+      .from("profiles")
+      .select("avg_rating")
+      .not("avg_rating", "is", null)
+      .gt("avg_rating", 0);
+    if (ratings && ratings.length > 0) {
+      const avg = ratings.reduce((s: number, r: any) => s + Number(r.avg_rating), 0) / ratings.length;
+      setAvgRating(avg.toFixed(1) + "★");
+    }
+  };
+
+  useEffect(() => {
     fetchProducts();
+
+    // Real-time — naya product add ho toh automatically update ho
+    const channel = supabase
+      .channel("home-products")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        fetchProducts();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return (
@@ -294,7 +325,7 @@ const Index = () => {
             </div>
             <div className="border-t border-border/30 pt-3 flex items-center justify-between">
               <div className="text-center">
-                <p className="text-lg font-extrabold text-secondary">500+</p>
+                <p className="text-lg font-extrabold text-secondary">{totalProducts > 0 ? `${totalProducts}+` : "500+"}</p>
                 <p className="text-[10px] text-muted-foreground">Products Listed</p>
               </div>
               <div className="text-center">
@@ -302,7 +333,7 @@ const Index = () => {
                 <p className="text-[10px] text-muted-foreground">Authentic</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-extrabold text-secondary">4.8★</p>
+                <p className="text-lg font-extrabold text-secondary">{avgRating !== "—" ? avgRating : "4.8★"}</p>
                 <p className="text-[10px] text-muted-foreground">User Rating</p>
               </div>
             </div>

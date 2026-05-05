@@ -65,7 +65,18 @@ const Search = () => {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, [selectedCategory, selectedCondition, selectedSize, priceRange]);
+  useEffect(() => { fetchProducts(); }, [selectedCategory, selectedCondition, selectedSize, priceRange, nearMe]);
+
+  // Real-time search updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("search-products")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+        fetchProducts();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -74,10 +85,45 @@ const Search = () => {
     if (selectedCondition !== "All") q = q.eq("condition", selectedCondition);
     if (selectedSize !== "All") q = q.eq("size", selectedSize);
     if (query) q = q.ilike("title", `%${query}%`);
+
+    // Near Me filter — location se products filter karo
+    if (nearMe && userLocation) {
+      const { lat, lng } = userLocation;
+      // 50km radius mein products
+      const latDelta = 0.45; // ~50km
+      const lngDelta = 0.45;
+      q = q
+        .gte("latitude", lat - latDelta)
+        .lte("latitude", lat + latDelta)
+        .gte("longitude", lng - lngDelta)
+        .lte("longitude", lng + lngDelta);
+    }
+
     q = q.order("created_at", { ascending: false });
     const { data } = await q;
     setProducts(data || []);
     setLoading(false);
+  };
+
+  const handleNearMe = () => {
+    if (!nearMe) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            setNearMe(true);
+            toast.success("Showing products near you! 📍");
+          },
+          () => toast.error("Could not get your location. Please enable location access.")
+        );
+      } else {
+        toast.error("Geolocation not supported on this device.");
+      }
+    } else {
+      setNearMe(false);
+      setUserLocation(null);
+      toast.info("Showing all products");
+    }
   };
 
   const handleSearch = () => fetchProducts();
@@ -106,6 +152,15 @@ const Search = () => {
           </div>
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
         </div>
+
+        {/* Near Me button */}
+        <button
+          onClick={handleNearMe}
+          className={`flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${nearMe ? "bg-secondary text-secondary-foreground" : "bg-secondary/10 text-secondary/70 hover:bg-secondary/20"}`}
+        >
+          <Navigation className="w-3 h-3" />
+          {nearMe ? "Near Me ✓" : "Near Me"}
+        </button>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3">
           {categories.map((cat) => (

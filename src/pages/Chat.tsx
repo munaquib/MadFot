@@ -77,6 +77,21 @@ const Chat = () => {
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
     fetchConversations();
+
+    // Real-time — conversation list update ho jab naya message aaye
+    const channel = supabase
+      .channel("conversations:" + user.id)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `receiver_id=eq.${user.id}`,
+      }, () => {
+        fetchConversations();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   useEffect(() => {
@@ -144,9 +159,14 @@ const Chat = () => {
           user_id: otherId,
           lastMsg: m.content,
           time: formatTime(m.created_at),
-          unread: (!m.is_read && m.receiver_id === user.id) ? 1 : 0,
+          unread: 0,
           product_id: m.product_id,
         });
+      }
+      // Properly count all unread messages
+      if (!m.is_read && m.receiver_id === user.id) {
+        const existing = convMap.get(otherId);
+        if (existing) existing.unread = (existing.unread || 0) + 1;
       }
     });
 

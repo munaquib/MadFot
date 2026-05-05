@@ -71,6 +71,27 @@ const ProductDetail = () => {
           const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
           setInWishlist(!!wl);
         }
+        // Track product view — update views_count
+        await supabase.rpc("increment_views", { product_id: id }).catch(() => {
+          // fallback: direct update
+          supabase.from("products").update({ views_count: (data.views_count || 0) + 1 }).eq("id", id);
+        });
+
+        // Track ad view — agar ye product promoted hai
+        const { data: activeAd } = await supabase
+          .from("ads")
+          .select("id")
+          .eq("product_id", id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (activeAd?.id) {
+          await supabase.from("ad_analytics").insert({
+            ad_id: activeAd.id,
+            event_type: "view",
+            user_id: user?.id || null,
+          }).catch(() => {});
+        }
+
         // Fetch similar items — same category, exclude current product
         if (data.category) {
           const { data: similar } = await supabase
@@ -104,9 +125,27 @@ const ProductDetail = () => {
     }
   };
 
+  const trackAdClick = async () => {
+    if (!id) return;
+    const { data: activeAd } = await supabase
+      .from("ads")
+      .select("id")
+      .eq("product_id", id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (activeAd?.id) {
+      await supabase.from("ad_analytics").insert({
+        ad_id: activeAd.id,
+        event_type: "click",
+        user_id: user?.id || null,
+      }).catch(() => {});
+    }
+  };
+
   const handleBuyNow = async () => {
     if (!product) return;
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    await trackAdClick();
     setPaying(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/razorpay-order`, {
