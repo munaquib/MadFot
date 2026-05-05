@@ -10,7 +10,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 const menuItems = [
-  { icon: Package, label: "My Orders", badge: "2", path: "/my-orders" },
+  { icon: Package, label: "My Orders", path: "/my-orders" },
   { icon: Heart, label: "Saved Items", path: "/wishlist" },
   { icon: Megaphone, label: "My Ads", path: "/my-ads" },
   { icon: Star, label: "My Reviews", path: "/my-reviews" },
@@ -25,6 +25,7 @@ const Profile = () => {
   const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   const [myListings, setMyListings] = useState<Tables<"products">[]>([]);
   const [promoteProduct, setPromoteProduct] = useState<Tables<"products"> | null>(null);
+  const [ordersCount, setOrdersCount] = useState(0);
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
@@ -32,6 +33,8 @@ const Profile = () => {
       setProfile(prof);
       const { data: listings } = await supabase.from("products").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
       setMyListings(listings || []);
+      const { count } = await supabase.from("orders").select("*", { count: "exact", head: true }).eq("buyer_id", user.id);
+      setOrdersCount(count || 0);
     };
     fetchData();
   }, [user]);
@@ -117,7 +120,7 @@ const Profile = () => {
               <button key={item.label} onClick={() => navigate(item.path)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-all duration-200 border-b border-border/20 last:border-b-0">
                 <item.icon className="w-5 h-5 text-secondary" />
                 <span className="flex-1 text-sm font-medium text-foreground text-left">{item.label}</span>
-                {item.badge && <span className="bg-secondary/10 text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">{item.badge}</span>}
+                {item.label === "My Orders" && ordersCount > 0 && <span className="bg-secondary/10 text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">{ordersCount}</span>}
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
             ))}

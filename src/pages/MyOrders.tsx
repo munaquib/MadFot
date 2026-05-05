@@ -63,7 +63,7 @@ const TrackingGuide = () => (
             <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Processing</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Aapka order place ho gaya hai! 🎉 Seller ne abhi confirm karna hai. Aapko <span className="font-semibold text-foreground">notification</span> milegi jab order confirm ho.
+            Your order has been placed! 🎉 Waiting for seller confirmation. You will receive a <span className="font-semibold text-foreground">notification</span> once your order is confirmed.
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ const TrackingGuide = () => (
             <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">In Transit 🚚</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Aapka order raaste mein hai! Delivery partner aapke ghar ki taraf aa raha hai. <span className="font-semibold text-foreground">Tracking ID</span> aapki email pe bheja jaayega.
+            Your order is on the way! Our delivery partner is heading to your address. A <span className="font-semibold text-foreground">Tracking ID</span> will be sent to your email.
           </p>
         </div>
       </div>
@@ -98,7 +98,7 @@ const TrackingGuide = () => (
             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Delivered ✅</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Order deliver ho gaya! Ab aap <span className="font-semibold text-foreground">seller ko rate</span> kar sakte hain aur apna experience share kar sakte hain. 🌟
+            Your order has been delivered! You can now <span className="font-semibold text-foreground">rate the seller</span> and share your experience. 🌟
           </p>
         </div>
       </div>
