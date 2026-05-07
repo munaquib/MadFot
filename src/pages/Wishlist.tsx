@@ -39,6 +39,18 @@ const Wishlist = () => {
       setLoading(false);
     };
     fetchWishlist();
+
+    // Real-time: wishlist change pe auto refresh
+    const channel = supabase
+      .channel("wishlist-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wishlist", filter: `user_id=eq.${user.id}` },
+        () => { fetchWishlist(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const removeFromWishlist = async (wishlistId: string) => {

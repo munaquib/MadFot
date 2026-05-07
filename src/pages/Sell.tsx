@@ -112,7 +112,7 @@ const Sell = () => {
             user_id: w.user_id,
             type: "price_drop",
             title: "💸 Price Drop Alert!",
-            message: `"${title}" ki price ₹${oldPrice.toLocaleString("en-IN")} se ghatkar ₹${parseInt(price).toLocaleString("en-IN")} ho gayi!`,
+            message: `"${title}" price dropped from ₹${oldPrice.toLocaleString("en-IN")} to ₹${parseInt(price).toLocaleString("en-IN")}!`,
             is_read: false,
           }));
           await supabase.from("notifications").insert(notifications);

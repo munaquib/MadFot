@@ -145,6 +145,28 @@ const MyOrders = () => {
       setLoading(false);
     };
     fetchOrders();
+
+    // Real-time: order status update pe auto refresh
+    const channel = supabase
+      .channel("my-orders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `buyer_id=eq.${user.id}` },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") {
+            setOrders((prev) => [payload.new as Order, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === payload.new.id ? (payload.new as Order) : o))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setOrders((prev) => prev.filter((o) => o.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   return (

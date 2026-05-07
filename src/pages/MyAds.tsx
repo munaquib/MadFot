@@ -56,6 +56,23 @@ const MyAds = () => {
       setLoading(false);
     };
     fetchAds();
+
+    // Real-time: ads table change pe auto refresh
+    const channel = supabase
+      .channel("my-ads-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ads", filter: `user_id=eq.${user.id}` },
+        () => { fetchAds(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ad_analytics" },
+        () => { fetchAds(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const totalViews = ads.reduce((s, a) => s + a.views, 0);

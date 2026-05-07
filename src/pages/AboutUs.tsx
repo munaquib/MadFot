@@ -1,9 +1,39 @@
+import { useEffect, useState } from "react";
 import { ArrowLeft, Crown, Heart, Shield, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 const AboutUs = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({ products: 0, rating: "0.0" });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      // Total products listed
+      const { count: productCount } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true });
+
+      // Average rating from reviews
+      const { data: ratingData } = await supabase
+        .from("reviews")
+        .select("rating");
+
+      let avgRating = "0.0";
+      if (ratingData && ratingData.length > 0) {
+        const sum = ratingData.reduce((acc: number, r: any) => acc + r.rating, 0);
+        avgRating = (sum / ratingData.length).toFixed(1);
+      }
+
+      setStats({
+        products: productCount || 0,
+        rating: avgRating,
+      });
+    };
+    fetchStats();
+  }, []);
+
   return (
     <AppLayout>
       <div className="gradient-primary px-4 py-5 rounded-b-[2rem] flex items-center gap-3">
@@ -53,12 +83,12 @@ const AboutUs = () => {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — Real data from Supabase */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { value: "500+", label: "Products Listed" },
+            { value: stats.products > 0 ? `${stats.products}+` : "—", label: "Products Listed" },
             { value: "100%", label: "Authentic" },
-            { value: "4.8★", label: "User Rating" },
+            { value: stats.rating !== "0.0" ? `${stats.rating}★` : "—", label: "User Rating" },
           ].map((s) => (
             <div key={s.label} className="glass-card rounded-2xl p-3 text-center border border-border/30 shadow-card">
               <p className="text-lg font-extrabold text-secondary">{s.value}</p>

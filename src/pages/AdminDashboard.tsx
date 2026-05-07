@@ -61,6 +61,25 @@ const AdminDashboard = () => {
         await fetchStats();
         await fetchSellers();
         await fetchReports();
+
+        // Real-time: ads, profiles, reports table changes pe auto refresh
+        const channel = supabase
+          .channel("admin-realtime")
+          .on("postgres_changes", { event: "*", schema: "public", table: "ads" }, () => {
+            fetchAds(); fetchStats();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+            fetchSellers();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
+            fetchReports();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "ad_analytics" }, () => {
+            fetchStats();
+          })
+          .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
       }
       setLoading(false);
     };
