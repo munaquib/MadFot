@@ -109,6 +109,19 @@ const ProductDetail = () => {
       setLoading(false);
     };
     fetchProduct();
+
+    // Real-time: product price/status/availability change pe auto update
+    if (!id) return;
+    const channel = supabase
+      .channel(`product-detail-${id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products", filter: `id=eq.${id}` },
+        (payload: any) => {
+          setProduct((prev: any) => prev ? { ...prev, ...payload.new } : payload.new);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [id, navigate, user]);
 
   const toggleWishlist = async () => {

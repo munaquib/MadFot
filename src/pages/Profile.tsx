@@ -37,6 +37,22 @@ const Profile = () => {
       setOrdersCount(count || 0);
     };
     fetchData();
+
+    // Real-time: profile, listings, orders change pe auto refresh
+    const channel = supabase
+      .channel("profile-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
+        () => { fetchData(); }
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "products", filter: `user_id=eq.${user.id}` },
+        () => { fetchData(); }
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `buyer_id=eq.${user.id}` },
+        () => { fetchData(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || "User";
