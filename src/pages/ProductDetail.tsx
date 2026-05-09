@@ -57,6 +57,9 @@ const ProductDetail = () => {
   }, []);
 
   useEffect(() => {
+    // Problem 2 Fix: page open hone par hamesha upar se start karo
+    window.scrollTo(0, 0);
+
     const fetchProduct = async () => {
       if (!id) return;
       try {
@@ -96,11 +99,12 @@ const ProductDetail = () => {
             });
           }
         } else {
-          toast.error("Product not found");
+          // Product not found — sirf console mein log karo
+          console.error("Product not found for id:", id);
         }
       } catch (err) {
+        // Problem 1 Fix: toast mat dikhao, sirf console log karo
         console.error("Product fetch error:", err);
-        toast.error("Failed to load product");
       } finally {
         setLoading(false);
       }
@@ -109,16 +113,23 @@ const ProductDetail = () => {
 
     // Real-time: product price/status/availability change pe auto update
     if (!id) return;
-    const channel = supabase
-      .channel(`product-detail-${id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products", filter: `id=eq.${id}` },
-        (payload: any) => {
-          setProduct((prev: any) => prev ? { ...prev, ...payload.new } : payload.new);
-        }
-      )
-      .subscribe();
+    let channel: any;
+    try {
+      channel = supabase
+        .channel(`product-detail-${id}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products", filter: `id=eq.${id}` },
+          (payload: any) => {
+            setProduct((prev: any) => prev ? { ...prev, ...payload.new } : payload.new);
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.error("Realtime channel error:", e);
+    }
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [id, navigate, user]);
 
   const toggleWishlist = async () => {
