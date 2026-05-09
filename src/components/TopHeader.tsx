@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, MapPin, User, ShoppingCart, Crown, Menu, SlidersHorizontal, Heart, Bell, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const marqueeItems = [
   "🔥 Flat 80% Off on Bridal Lehengas",
@@ -79,6 +80,28 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
   const [recentlyUsed, setRecentlyUsed] = useState<string>(() => {
     try { return localStorage.getItem("madfod_recent_location") || ""; } catch { return ""; }
   });
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifs = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+      setUnreadNotifs(count || 0);
+    };
+    fetchNotifs();
+    const channel = supabase
+      .channel("topheader-notifs")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => { fetchNotifs(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const detectCity = async (pos: GeolocationPosition) => {
     try {
@@ -236,8 +259,13 @@ const TopHeader = ({ sidebarOpen, onToggleSidebar, onFilterClick }: TopHeaderPro
           <button onClick={() => navigate("/wishlist")} className="w-9 h-9 bg-secondary/20 rounded-lg flex items-center justify-center shrink-0">
             <Heart className="w-4 h-4 text-secondary" />
           </button>
-          <button onClick={() => navigate("/notifications")} className="w-9 h-9 bg-secondary/20 rounded-lg flex items-center justify-center shrink-0">
+          <button onClick={() => navigate("/notifications")} className="w-9 h-9 bg-secondary/20 rounded-lg flex items-center justify-center shrink-0 relative">
             <Bell className="w-4 h-4 text-secondary" />
+            {unreadNotifs > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                {unreadNotifs > 99 ? "99+" : unreadNotifs}
+              </span>
+            )}
           </button>
         </div>
       </div>

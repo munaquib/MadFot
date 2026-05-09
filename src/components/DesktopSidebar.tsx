@@ -1,15 +1,8 @@
+import { useState, useEffect } from "react";
 import { Home, Search, PlusCircle, Bell, User, MessageCircle, Heart, Crown, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-const navItems = [
-  { icon: Home, label: "Home", path: "/" },
-  { icon: Search, label: "Search", path: "/search" },
-  { icon: PlusCircle, label: "Sell", path: "/sell" },
-  { icon: Heart, label: "Wishlist", path: "/wishlist" },
-  { icon: MessageCircle, label: "Chat", path: "/chat" },
-  { icon: Bell, label: "Notifications", path: "/notifications" },
-  { icon: User, label: "Profile", path: "/profile" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DesktopSidebarProps {
   open: boolean;
@@ -19,6 +12,58 @@ interface DesktopSidebarProps {
 const DesktopSidebar = ({ open, onToggle }: DesktopSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNotifs = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+      setUnreadNotifs(count || 0);
+    };
+
+    const fetchChats = async () => {
+      const { count } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("receiver_id", user.id)
+        .eq("is_read", false);
+      setUnreadChats(count || 0);
+    };
+
+    fetchNotifs();
+    fetchChats();
+
+    const channel = supabase
+      .channel("sidebar-realtime")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => { fetchNotifs(); }
+      )
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` },
+        () => { fetchChats(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const navItems = [
+    { icon: Home, label: "Home", path: "/" },
+    { icon: Search, label: "Search", path: "/search" },
+    { icon: PlusCircle, label: "Sell", path: "/sell" },
+    { icon: Heart, label: "Wishlist", path: "/wishlist" },
+    { icon: MessageCircle, label: "Chat", path: "/chat", badge: unreadChats },
+    { icon: Bell, label: "Notifications", path: "/notifications", badge: unreadNotifs },
+    { icon: User, label: "Profile", path: "/profile" },
+  ];
 
   return (
     <aside
@@ -53,8 +98,20 @@ const DesktopSidebar = ({ open, onToggle }: DesktopSidebarProps) => {
                   : "text-secondary/50 hover:bg-secondary/8 hover:text-secondary/80"
               }`}
             >
-              <item.icon className={`w-5 h-5 ${isActive ? "text-secondary" : ""}`} />
+              <div className="relative">
+                <item.icon className={`w-5 h-5 ${isActive ? "text-secondary" : ""}`} />
+                {item.badge && item.badge > 0 ? (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                ) : null}
+              </div>
               {item.label}
+              {item.badge && item.badge > 0 ? (
+                <span className="ml-auto bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              ) : null}
             </button>
           );
         })}
