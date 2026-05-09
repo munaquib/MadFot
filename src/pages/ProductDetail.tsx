@@ -59,54 +59,52 @@ const ProductDetail = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
-      const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
-      if (data && !error) {
-        setProduct(data);
-        const { data: prof } = await supabase.from("profiles").select("full_name, avg_rating, total_reviews, is_verified").eq("user_id", data.user_id).single();
-        if (prof?.full_name) setSellerName(prof.full_name);
-        if ((prof as any)?.avg_rating) setSellerAvgRating((prof as any).avg_rating);
-        if ((prof as any)?.total_reviews) setSellerTotalReviews((prof as any).total_reviews);
-        if ((prof as any)?.is_verified) setSellerIsVerified((prof as any).is_verified);
-        if (user) {
-          const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
-          setInWishlist(!!wl);
-        }
-        // Track product view — update views_count
-        await supabase.rpc("increment_views", { product_id: id }).catch(() => {
-          // fallback: direct update
-          supabase.from("products").update({ views_count: (data.views_count || 0) + 1 }).eq("id", id);
-        });
+      try {
+        const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
+        if (data && !error) {
+          setProduct(data);
 
-        // Track ad view — agar ye product promoted hai
-        const { data: activeAd } = await supabase
-          .from("ads")
-          .select("id")
-          .eq("product_id", id)
-          .eq("status", "active")
-          .maybeSingle();
-        if (activeAd?.id) {
-          await supabase.from("ad_analytics").insert({
-            ad_id: activeAd.id,
-            event_type: "view",
-            user_id: user?.id || null,
-          }).catch(() => {});
-        }
+          // Seller profile fetch
+          const { data: prof } = await supabase.from("profiles").select("full_name, avg_rating, total_reviews, is_verified").eq("user_id", data.user_id).single();
+          if (prof?.full_name) setSellerName(prof.full_name);
+          if ((prof as any)?.avg_rating) setSellerAvgRating((prof as any).avg_rating);
+          if ((prof as any)?.total_reviews) setSellerTotalReviews((prof as any).total_reviews);
+          if ((prof as any)?.is_verified) setSellerIsVerified((prof as any).is_verified);
 
-        // Fetch similar items — same category, exclude current product
-        if (data.category) {
-          const { data: similar } = await supabase
-            .from("products")
-            .select("id, title, price, images")
-            .eq("category", data.category)
-            .neq("id", id)
-            .limit(6);
-          setSimilarProducts(similar || []);
+          // Wishlist check
+          if (user) {
+            const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
+            setInWishlist(!!wl);
+          }
+
+          // Track view — fire and forget, loading block nahi karega
+          supabase.rpc("increment_views", { product_id: id }).catch(() => {
+            supabase.from("products").update({ views_count: (data.views_count || 0) + 1 }).eq("id", id).then();
+          });
+
+          // Track ad view — fire and forget
+          supabase.from("ads").select("id").eq("product_id", id).eq("status", "active").maybeSingle().then(({ data: activeAd }) => {
+            if (activeAd?.id) {
+              supabase.from("ad_analytics").insert({ ad_id: activeAd.id, event_type: "view", user_id: user?.id || null }).then();
+            }
+          });
+
+          // Similar items — fire and forget
+          if (data.category) {
+            supabase.from("products").select("id, title, price, images").eq("category", data.category).neq("id", id).limit(6).then(({ data: similar }) => {
+              setSimilarProducts(similar || []);
+            });
+          }
+        } else {
+          toast.error("Product not found");
+          navigate("/");
         }
-      } else {
-        toast.error("Product not found");
+      } catch (err) {
+        toast.error("Failed to load product");
         navigate("/");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchProduct();
 
