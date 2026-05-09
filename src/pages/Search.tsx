@@ -3,6 +3,7 @@ import { Search as SearchIcon, MapPin, Heart, X, SlidersHorizontal, ShieldCheck,
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -26,6 +27,39 @@ const Search = () => {
   const [nearMe, setNearMe] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchWishlist = async () => {
+      const { data } = await supabase.from("wishlist").select("product_id").eq("user_id", user.id);
+      if (data) setWishlistIds(new Set(data.map((w: any) => w.product_id)));
+    };
+    fetchWishlist();
+    const wlChannel = supabase
+      .channel("search-wishlist-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "wishlist", filter: `user_id=eq.${user.id}` },
+        () => { fetchWishlist(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(wlChannel); };
+  }, [user]);
+
+  const toggleWishlist = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    if (!user) { toast.error("Please login to save items"); return; }
+    const alreadyIn = wishlistIds.has(productId);
+    if (alreadyIn) {
+      await supabase.from("wishlist").delete().eq("user_id", user.id).eq("product_id", productId);
+      setWishlistIds(prev => { const n = new Set(prev); n.delete(productId); return n; });
+      toast.success("Removed from wishlist");
+    } else {
+      await supabase.from("wishlist").insert({ user_id: user.id, product_id: productId });
+      setWishlistIds(prev => new Set(prev).add(productId));
+      toast.success("Added to wishlist! ❤️");
+    }
+  };
 
   const handleImageSearch = () => {
     imageInputRef.current?.click();
@@ -258,7 +292,12 @@ const Search = () => {
               >
                 <div className="relative overflow-hidden">
                   <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy" className="w-full h-36 md:h-48 object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <button className="absolute top-2 right-2 w-7 h-7 glass-card rounded-full flex items-center justify-center"><Heart className="w-3.5 h-3.5 text-secondary" /></button>
+                  <button
+                    onClick={(e) => toggleWishlist(e, item.id)}
+                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${wishlistIds.has(item.id) ? "bg-red-500 text-white" : "glass-card text-secondary hover:bg-red-50"}`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
+                  </button>
                   <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
                   <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                     <ShieldCheck className="w-2.5 h-2.5" /> Verified

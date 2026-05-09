@@ -6,7 +6,9 @@ import AppLayout from "@/components/AppLayout";
 import WhyBuyPreLoved from "@/components/WhyBuyPreLoved";
 import SponsoredCarousel from "@/components/SponsoredCarousel";
 import SponsoredInFeed from "@/components/SponsoredInFeed";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import heroLuxury from "@/assets/hero-luxury.jpg";
 import catLehengaImg from "@/assets/cat-lehenga.jpg";
@@ -41,6 +43,45 @@ const Index = () => {
 
   const [totalProducts, setTotalProducts] = useState(0);
   const [avgRating, setAvgRating] = useState("—");
+  const { user } = useAuth();
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  // Wishlist IDs fetch karo
+  useEffect(() => {
+    if (!user) return;
+    const fetchWishlist = async () => {
+      const { data } = await supabase
+        .from("wishlist")
+        .select("product_id")
+        .eq("user_id", user.id);
+      if (data) setWishlistIds(new Set(data.map((w: any) => w.product_id)));
+    };
+    fetchWishlist();
+
+    // Real-time wishlist sync
+    const wlChannel = supabase
+      .channel("index-wishlist-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "wishlist", filter: `user_id=eq.${user.id}` },
+        () => { fetchWishlist(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(wlChannel); };
+  }, [user]);
+
+  const toggleWishlist = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    if (!user) { toast.error("Please login to save items"); return; }
+    const alreadyIn = wishlistIds.has(productId);
+    if (alreadyIn) {
+      await supabase.from("wishlist").delete().eq("user_id", user.id).eq("product_id", productId);
+      setWishlistIds(prev => { const n = new Set(prev); n.delete(productId); return n; });
+      toast.success("Removed from wishlist");
+    } else {
+      await supabase.from("wishlist").insert({ user_id: user.id, product_id: productId });
+      setWishlistIds(prev => new Set(prev).add(productId));
+      toast.success("Added to wishlist! ❤️");
+    }
+  };
 
   const fetchProducts = async () => {
     const { data: featured } = await supabase
@@ -233,8 +274,11 @@ const Index = () => {
               >
                 <div className="relative overflow-hidden">
                   <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy" className="w-full h-36 md:h-48 lg:h-56 object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <button className="absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 glass-card rounded-full flex items-center justify-center">
-                    <Heart className="w-3.5 h-3.5 md:w-4 md:h-4 text-secondary" />
+                  <button
+                    onClick={(e) => toggleWishlist(e, item.id)}
+                    className={`absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${wishlistIds.has(item.id) ? "bg-red-500 text-white" : "glass-card text-secondary hover:bg-red-50"}`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
                   </button>
                   <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
                   <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
@@ -285,7 +329,12 @@ const Index = () => {
                     <span className="text-[10px] md:text-xs">{item.location}</span>
                   </div>
                 </div>
-                <Heart className="w-4 h-4 text-muted-foreground" />
+                <button
+                  onClick={(e) => toggleWishlist(e, item.id)}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${wishlistIds.has(item.id) ? "bg-red-500 text-white" : "hover:bg-red-50 text-muted-foreground"}`}
+                >
+                  <Heart className={`w-4 h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
+                </button>
               </motion.div>
             ))}
           </div>
