@@ -97,11 +97,10 @@ const ProductDetail = () => {
           }
         } else {
           toast.error("Product not found");
-          navigate("/");
         }
       } catch (err) {
+        console.error("Product fetch error:", err);
         toast.error("Failed to load product");
-        navigate("/");
       } finally {
         setLoading(false);
       }
