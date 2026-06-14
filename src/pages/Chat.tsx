@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, CheckCheck, MoreVertical, Flag, Ban } from "lucide-react";
+import { ArrowLeft, Send, CheckCheck, MoreVertical, Flag, Ban, Phone, Camera, MapPin, Tag, Loader2 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ interface Conversation {
   unread: number;
   online: boolean;
   product_id?: string;
+  phone?: string;
 }
 
 const formatTime = (ts: string) => {
@@ -54,6 +55,12 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // New action states
+  const [showOfferDialog, setShowOfferDialog] = useState(false);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Report/Block states
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -103,7 +110,7 @@ const Chat = () => {
   const fetchSellerAndOpen = async (sellerId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, user_id")
+      .select("full_name, user_id, phone")
       .eq("user_id", sellerId)
       .single();
     if (data) {
@@ -117,6 +124,7 @@ const Chat = () => {
         unread: 0,
         online: false,
         product_id: productIdParam || undefined,
+        phone: (data as any).phone || undefined,
       };
       openChat(conv);
       if (offerParam) {
@@ -154,10 +162,13 @@ const Chat = () => {
     const convMap = new Map<string, any>();
     msgs.forEach((m: any) => {
       const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
+      let preview = m.content as string;
+      if (preview?.startsWith("📷::")) preview = "📷 Photo";
+      else if (preview?.startsWith("📍::")) preview = "📍 Location";
       if (!convMap.has(otherId)) {
         convMap.set(otherId, {
           user_id: otherId,
-          lastMsg: m.content,
+          lastMsg: preview,
           time: formatTime(m.created_at),
           unread: 0,
           product_id: m.product_id,
@@ -173,7 +184,7 @@ const Chat = () => {
     const userIds = Array.from(convMap.keys());
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("user_id, full_name")
+      .select("user_id, full_name, phone")
       .in("user_id", userIds);
 
     const convList: Conversation[] = userIds.map(uid => {
@@ -185,6 +196,7 @@ const Chat = () => {
         full_name: name,
         avatar: name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
         online: false,
+        phone: (prof as any)?.phone || undefined,
       };
     });
 
@@ -273,7 +285,81 @@ const Chat = () => {
     }
   };
 
-  // Report user from chat
+  // Send an offer message
+  const handleSendOffer = async () => {
+    if (!offerAmount || !activeChat || !user) return;
+    const amt = Number(offerAmount);
+    if (!amt || amt <= 0) { toast.error("Please enter a valid amount"); return; }
+    await sendSpecialMessage(
+      activeChat.user_id,
+      `💰 I'd like to make an offer of ₹${amt.toLocaleString("en-IN")} for this item.`,
+      activeChat.product_id
+    );
+    setOfferAmount("");
+    setShowOfferDialog(false);
+  };
+
+  // Share current location
+  const handleShareLocation = () => {
+    if (!activeChat || !user) return;
+    if (!navigator.geolocation) {
+      toast.error("Location not supported on this device");
+      return;
+    }
+    toast.info("Getting your location... 📍");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const { data, error } = await supabase.from("messages").insert({
+          sender_id: user.id,
+          receiver_id: activeChat.user_id,
+          product_id: activeChat.product_id || null,
+          content: `📍::${latitude},${longitude}`,
+        } as any).select().single();
+        if (error) { toast.error("Failed to share location"); return; }
+        if (data) setMessages(prev => [...prev, data as any]);
+      },
+      () => toast.error("Location permission denied")
+    );
+  };
+
+  // Open photo picker
+  const handlePhotoClick = () => {
+    photoInputRef.current?.click();
+  };
+
+  // Upload and send photo
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChat || !user) return;
+    e.target.value = "";
+
+    setUploadingPhoto(true);
+    toast.info("Uploading photo... 📤");
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/chat_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("product-images").upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+
+      const { data, error } = await supabase.from("messages").insert({
+        sender_id: user.id,
+        receiver_id: activeChat.user_id,
+        product_id: activeChat.product_id || null,
+        content: `📷::${urlData.publicUrl}`,
+      } as any).select().single();
+
+      if (error) throw error;
+      if (data) setMessages(prev => [...prev, data as any]);
+    } catch {
+      toast.error("Photo upload failed. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+
   const handleReportUser = async () => {
     if (!user || !activeChat) return;
     if (!reportReason.trim()) { toast.error("Please select a reason"); return; }
@@ -333,6 +419,17 @@ const Chat = () => {
               <p className="text-secondary/50 text-[10px]">Active</p>
             </div>
 
+            {/* Call button */}
+            {activeChat.phone && (
+              <a
+                href={`tel:${activeChat.phone}`}
+                className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors"
+                title="Call"
+              >
+                <Phone className="w-4 h-4 text-secondary" />
+              </a>
+            )}
+
             {/* 3-dot menu in chat header */}
             <div className="relative" ref={chatMenuRef}>
               <button
@@ -372,7 +469,25 @@ const Chat = () => {
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${msg.sender_id === user?.id ? "bg-primary text-secondary" : "bg-muted text-foreground"}`}>
-                  {msg.content}
+                  {msg.content.startsWith("📷::") ? (
+                    <img
+                      src={msg.content.replace("📷::", "")}
+                      alt="Shared photo"
+                      onClick={() => window.open(msg.content.replace("📷::", ""), "_blank")}
+                      className="max-w-[180px] max-h-[180px] rounded-lg object-cover cursor-pointer"
+                    />
+                  ) : msg.content.startsWith("📍::") ? (
+                    <a
+                      href={`https://www.google.com/maps?q=${msg.content.replace("📍::", "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm underline"
+                    >
+                      <MapPin className="w-4 h-4" /> Shared Location
+                    </a>
+                  ) : (
+                    msg.content
+                  )}
                   <div className={`flex items-center gap-1 mt-0.5 ${msg.sender_id === user?.id ? "justify-end" : "justify-start"}`}>
                     <span className="text-[9px] opacity-60">{formatTime(msg.created_at)}</span>
                     {msg.sender_id === user?.id && (
@@ -383,6 +498,34 @@ const Chat = () => {
               </div>
             ))}
             <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Actions */}
+          <div className="px-4 pb-2 flex gap-2">
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelected} />
+            <button
+              onClick={handlePhotoClick}
+              disabled={uploadingPhoto}
+              className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-secondary/10 transition-colors disabled:opacity-50"
+              title="Share photo"
+            >
+              {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin text-secondary" /> : <Camera className="w-4 h-4 text-secondary" />}
+            </button>
+            <button
+              onClick={handleShareLocation}
+              className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-secondary/10 transition-colors"
+              title="Share location"
+            >
+              <MapPin className="w-4 h-4 text-secondary" />
+            </button>
+            <button
+              onClick={() => setShowOfferDialog(true)}
+              className="h-9 px-3 rounded-xl bg-muted flex items-center gap-1.5 hover:bg-secondary/10 transition-colors"
+              title="Make an offer"
+            >
+              <Tag className="w-4 h-4 text-secondary" />
+              <span className="text-xs font-semibold text-foreground">Make Offer</span>
+            </button>
           </div>
 
           {/* Message Input */}
@@ -399,6 +542,35 @@ const Chat = () => {
             </button>
           </div>
         </div>
+
+        {/* Make Offer Dialog */}
+        <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
+          <DialogContent className="max-w-sm mx-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg flex items-center gap-2">
+                <Tag className="w-5 h-5 text-secondary" /> Make an Offer
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">Enter the price you'd like to offer for this item:</p>
+              <input
+                type="number"
+                value={offerAmount}
+                onChange={(e) => setOfferAmount(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendOffer()}
+                placeholder="Enter amount in ₹"
+                className="w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              />
+              <button
+                onClick={handleSendOffer}
+                disabled={!offerAmount}
+                className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <Tag className="w-4 h-4" /> Send Offer
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Report User Dialog */}
         <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
