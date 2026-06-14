@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Camera, Image, ChevronDown, X, Loader2, Truck } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Camera, Image, ChevronDown, X, Loader2, Truck, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import LocationPicker from "@/components/LocationPicker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 const sizes = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
@@ -34,6 +35,18 @@ const Sell = () => {
   const [lng, setLng] = useState<number | undefined>();
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [oldPrice, setOldPrice] = useState<number | null>(null);
+
+  // Phone number setup for sellers
+  const [myPhone, setMyPhone] = useState<string | null>(null);
+  const [showPhoneDialog, setShowPhoneDialog] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("phone").eq("user_id", user.id).single().then(({ data }) => {
+      if (data) setMyPhone((data as any).phone || null);
+    });
+  }, [user]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -63,7 +76,33 @@ const Sell = () => {
       toast.error("Please add at least one photo");
       return;
     }
+    if (!myPhone) {
+      setPhoneInput("");
+      setShowPhoneDialog(true);
+      return;
+    }
 
+    await proceedSubmit();
+  };
+
+  // Save phone number, then continue posting the ad
+  const handleSavePhoneAndContinue = async () => {
+    if (!user) return;
+    const trimmed = phoneInput.trim();
+    if (!trimmed || trimmed.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    const { error } = await supabase.from("profiles").update({ phone: trimmed } as any).eq("user_id", user.id);
+    if (error) { toast.error("Failed to save number"); return; }
+    setMyPhone(trimmed);
+    setShowPhoneDialog(false);
+    toast.success("Number saved! 📞");
+    await proceedSubmit();
+  };
+
+  const proceedSubmit = async () => {
+    if (!user) return;
     setSubmitting(true);
     try {
       // Upload images
@@ -263,6 +302,37 @@ const Sell = () => {
           {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : "👗 Post Ad — Sell Now"}
         </button>
       </div>
+
+      {/* Phone Number Setup Dialog */}
+      <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <Phone className="w-5 h-5 text-secondary" /> Add Your Phone Number
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Buyers aapko call kar sakein, iske liye apna phone number add karo. Ye sirf interested buyers ko dikhega.
+            </p>
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSavePhoneAndContinue()}
+              placeholder="+91 XXXXX XXXXX"
+              className="w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+            />
+            <button
+              onClick={handleSavePhoneAndContinue}
+              disabled={!phoneInput.trim() || submitting}
+              className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : <><Phone className="w-4 h-4" /> Save & Post Ad</>}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

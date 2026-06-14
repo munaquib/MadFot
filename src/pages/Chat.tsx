@@ -62,6 +62,11 @@ const Chat = () => {
   const [offerAmount, setOfferAmount] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Phone number setup for Call feature
+  const [myPhone, setMyPhone] = useState<string | null>(null);
+  const [showSetupPhoneDialog, setShowSetupPhoneDialog] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+
   // Report/Block states
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -106,6 +111,14 @@ const Chat = () => {
       fetchSellerAndOpen(sellerIdParam);
     }
   }, [sellerIdParam, user]);
+
+  // Fetch current user's own phone number (for Call gating)
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("phone").eq("user_id", user.id).single().then(({ data }) => {
+      if (data) setMyPhone((data as any).phone || null);
+    });
+  }, [user]);
 
   const fetchSellerAndOpen = async (sellerId: string) => {
     const { data } = await supabase
@@ -328,6 +341,39 @@ const Chat = () => {
     photoInputRef.current?.click();
   };
 
+  // Call button click — gate behind own phone number setup
+  const handleCallClick = () => {
+    if (!myPhone) {
+      setPhoneInput("");
+      setShowSetupPhoneDialog(true);
+      return;
+    }
+    if (activeChat?.phone) {
+      window.location.href = `tel:${activeChat.phone}`;
+    } else {
+      toast.error("Seller ne abhi apna number share nahi kiya hai");
+    }
+  };
+
+  // Save phone number from setup dialog
+  const handleSavePhone = async () => {
+    if (!user) return;
+    const trimmed = phoneInput.trim();
+    if (!trimmed || trimmed.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    const { error } = await supabase.from("profiles").update({ phone: trimmed } as any).eq("user_id", user.id);
+    if (error) { toast.error("Failed to save number"); return; }
+    setMyPhone(trimmed);
+    setShowSetupPhoneDialog(false);
+    toast.success("Number saved! 📞");
+    if (activeChat?.phone) {
+      setTimeout(() => { window.location.href = `tel:${activeChat.phone}`; }, 400);
+    }
+  };
+
+
   // Upload and send photo
   const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -419,16 +465,14 @@ const Chat = () => {
               <p className="text-secondary/50 text-[10px]">Active</p>
             </div>
 
-            {/* Call button */}
-            {activeChat.phone && (
-              <a
-                href={`tel:${activeChat.phone}`}
-                className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors"
-                title="Call"
-              >
-                <Phone className="w-4 h-4 text-secondary" />
-              </a>
-            )}
+            {/* Call button — always visible */}
+            <button
+              onClick={handleCallClick}
+              className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors"
+              title="Call"
+            >
+              <Phone className="w-4 h-4 text-secondary" />
+            </button>
 
             {/* 3-dot menu in chat header */}
             <div className="relative" ref={chatMenuRef}>
@@ -542,6 +586,37 @@ const Chat = () => {
             </button>
           </div>
         </div>
+
+        {/* Set Up Phone Number Dialog */}
+        <Dialog open={showSetupPhoneDialog} onOpenChange={setShowSetupPhoneDialog}>
+          <DialogContent className="max-w-sm mx-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg flex items-center gap-2">
+                <Phone className="w-5 h-5 text-secondary" /> Set Up Your Number
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Call feature use karne ke liye apna phone number add karo. Ye sirf chat karne wale users ko dikhega.
+              </p>
+              <input
+                type="tel"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSavePhone()}
+                placeholder="+91 XXXXX XXXXX"
+                className="w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              />
+              <button
+                onClick={handleSavePhone}
+                disabled={!phoneInput.trim()}
+                className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <Phone className="w-4 h-4" /> Save & Continue
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Make Offer Dialog */}
         <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
