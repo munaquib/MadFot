@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, CheckCheck, MoreVertical, Flag, Ban, Phone, Camera, MapPin, Tag, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Check, CheckCheck, MoreVertical, Flag, Ban, Phone, Camera, MapPin, Tag, Loader2 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ interface Message {
   product_id?: string;
   content: string;
   is_read: boolean;
+  is_delivered: boolean;
   created_at: string;
 }
 
@@ -22,6 +23,7 @@ interface Conversation {
   user_id: string;
   full_name: string;
   avatar: string;
+  avatar_url?: string | null;
   lastMsg: string;
   time: string;
   unread: number;
@@ -58,6 +60,7 @@ const Chat = () => {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   // New action states
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [showOfferDialog, setShowOfferDialog] = useState(false);
   const [offerAmount, setOfferAmount] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -103,7 +106,40 @@ const Chat = () => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Presence tracking — online/offline status
+    const presenceChannel = supabase.channel("online-users")
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const online = new Set<string>();
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => { if (p.user_id) online.add(p.user_id); });
+        });
+        setOnlineUsers(online);
+      })
+      .on("presence", { event: "join" }, ({ key, newPresences }: any) => {
+        setOnlineUsers(prev => {
+          const next = new Set(prev);
+          newPresences.forEach((p: any) => { if (p.user_id) next.add(p.user_id); });
+          return next;
+        });
+      })
+      .on("presence", { event: "leave" }, ({ key, leftPresences }: any) => {
+        setOnlineUsers(prev => {
+          const next = new Set(prev);
+          leftPresences.forEach((p: any) => { if (p.user_id) next.delete(p.user_id); });
+          return next;
+        });
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({ user_id: user.id });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(presenceChannel);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -123,7 +159,7 @@ const Chat = () => {
   const fetchSellerAndOpen = async (sellerId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, user_id, phone")
+      .select("full_name, user_id, phone, avatar_url")
       .eq("user_id", sellerId)
       .single();
     if (data) {
@@ -132,6 +168,7 @@ const Chat = () => {
         user_id: data.user_id,
         full_name: name,
         avatar: name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
+        avatar_url: (data as any).avatar_url || null,
         lastMsg: "",
         time: "now",
         unread: 0,
@@ -197,7 +234,7 @@ const Chat = () => {
     const userIds = Array.from(convMap.keys());
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("user_id, full_name, phone")
+      .select("user_id, full_name, phone, avatar_url")
       .in("user_id", userIds);
 
     const convList: Conversation[] = userIds.map(uid => {
@@ -208,6 +245,7 @@ const Chat = () => {
         ...d,
         full_name: name,
         avatar: name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2),
+        avatar_url: (prof as any)?.avatar_url || null,
         online: false,
         phone: (prof as any)?.phone || undefined,
       };
@@ -236,6 +274,14 @@ const Chat = () => {
       .update({ is_read: true })
       .eq("receiver_id", user.id)
       .eq("sender_id", conv.user_id);
+
+    // Mark sender's messages as delivered when we open chat
+    await supabase
+      .from("messages")
+      .update({ is_delivered: true })
+      .eq("sender_id", user.id)
+      .eq("receiver_id", conv.user_id)
+      .eq("is_delivered", false);
 
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
@@ -457,12 +503,22 @@ const Chat = () => {
             >
               <ArrowLeft className="w-4 h-4 text-secondary" />
             </button>
-            <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-sm">
-              {activeChat.avatar}
-            </div>
+            {activeChat.avatar_url ? (
+              <img
+                src={activeChat.avatar_url}
+                alt={activeChat.full_name}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-sm">
+                {activeChat.avatar}
+              </div>
+            )}
             <div className="flex-1">
               <p className="text-secondary font-semibold text-sm">{activeChat.full_name}</p>
-              <p className="text-secondary/50 text-[10px]">Active</p>
+              <p className={`text-[10px] ${onlineUsers.has(activeChat.user_id) ? "text-emerald-400" : "text-secondary/50"}`}>
+                {onlineUsers.has(activeChat.user_id) ? "🟢 Online" : "Offline"}
+              </p>
             </div>
 
             {/* Call button — always visible */}
@@ -535,7 +591,18 @@ const Chat = () => {
                   <div className={`flex items-center gap-1 mt-0.5 ${msg.sender_id === user?.id ? "justify-end" : "justify-start"}`}>
                     <span className="text-[9px] opacity-60">{formatTime(msg.created_at)}</span>
                     {msg.sender_id === user?.id && (
-                      <CheckCheck className={`w-3 h-3 ${msg.is_read ? "opacity-100" : "opacity-40"}`} />
+                      <span className="flex items-center">
+                        {msg.is_read ? (
+                          // Receiver ne dekh liya — blue double tick
+                          <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
+                        ) : onlineUsers.has(activeChat.user_id) ? (
+                          // Receiver online hai, abhi dekha nahi — grey double tick
+                          <CheckCheck className="w-3.5 h-3.5 opacity-50" />
+                        ) : (
+                          // Receiver offline hai — single grey tick
+                          <Check className="w-3.5 h-3.5 opacity-50" />
+                        )}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -744,9 +811,20 @@ const Chat = () => {
             className="glass-card rounded-2xl p-3 md:p-4 shadow-card flex items-center gap-3 border border-border/30 cursor-pointer hover:shadow-luxury transition-all duration-300"
           >
             <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">
-                {conv.avatar}
-              </div>
+              {conv.avatar_url ? (
+                <img
+                  src={conv.avatar_url}
+                  alt={conv.full_name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">
+                  {conv.avatar}
+                </div>
+              )}
+              {onlineUsers.has(conv.user_id) && (
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-card" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
