@@ -290,36 +290,67 @@ const ProductDetail = () => {
   return (
     <AppLayout>
       <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:px-2 lg:py-6">
-        {/* Image Section with Carousel */}
+        {/* Image Section with Carousel — Touch Swipe + Preload Fix */}
         <div className="relative">
-          <div className="relative aspect-[3/4] md:aspect-square overflow-hidden rounded-b-3xl lg:rounded-3xl bg-muted">
-            <img
-              src={images[currentImageIndex]}
-              alt={product.title}
-              className="w-full h-full object-contain cursor-pointer bg-muted"
-              onClick={() => setLightboxOpen(true)}
-            />
+          {/* Preload all images silently so switching is instant */}
+          {images.map((src: string, idx: number) => (
+            idx !== currentImageIndex && <link key={idx} rel="preload" as="image" href={src} />
+          ))}
+
+          <div
+            className="relative aspect-[3/4] md:aspect-square overflow-hidden rounded-b-3xl lg:rounded-3xl bg-muted"
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              (e.currentTarget as any)._touchStartX = touch.clientX;
+              (e.currentTarget as any)._touchStartY = touch.clientY;
+            }}
+            onTouchEnd={(e) => {
+              const startX = (e.currentTarget as any)._touchStartX;
+              const startY = (e.currentTarget as any)._touchStartY;
+              if (startX === undefined) return;
+              const touch = e.changedTouches[0];
+              const dx = touch.clientX - startX;
+              const dy = touch.clientY - startY;
+              // Only horizontal swipe (dx > dy)
+              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+                if (dx < 0) goToNext();
+                else goToPrev();
+              }
+            }}
+          >
+            {/* All images stacked — only current one visible — instant switch no reload */}
+            {images.map((src: string, idx: number) => (
+              <img
+                key={idx}
+                src={src}
+                alt={product.title}
+                className={`absolute inset-0 w-full h-full object-contain bg-muted transition-opacity duration-200 cursor-pointer ${idx === currentImageIndex ? "opacity-100 z-10" : "opacity-0 z-0"}`}
+                onClick={() => setLightboxOpen(true)}
+                loading={idx === 0 ? "eager" : "lazy"}
+              />
+            ))}
+
             {totalImages > 1 && (
               <>
-                <button onClick={goToPrev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-10">
+                <button onClick={goToPrev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-20">
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <button onClick={goToNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-10">
+                <button onClick={goToNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-20">
                   <ChevronRight className="w-5 h-5" />
                 </button>
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
                   {images.map((_: any, idx: number) => (
                     <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentImageIndex ? "bg-white w-4" : "bg-white/50"}`} />
                   ))}
                 </div>
               </>
             )}
-            <div className="absolute top-3 left-3 flex gap-2 z-10">
+            <div className="absolute top-3 left-3 flex gap-2 z-20">
               <button onClick={() => navigate(-1)} className="w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
                 <ArrowLeft className="w-4 h-4" />
               </button>
             </div>
-            <div className="absolute top-3 right-3 flex gap-2 z-10">
+            <div className="absolute top-3 right-3 flex gap-2 z-20">
               <button onClick={handleShare} className="w-9 h-9 bg-black/30 rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors">
                 <Share2 className="w-4 h-4" />
               </button>
