@@ -215,7 +215,10 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/70 to-transparent flex flex-col items-start justify-center px-5 md:px-10">
             <span className="text-[10px] md:text-xs text-secondary/70 font-medium tracking-widest uppercase">Exclusive Pieces, Exceptional Prices</span>
             <h2 className="text-xl md:text-3xl lg:text-4xl font-extrabold text-secondary font-serif leading-tight mt-1">Buy & Sell Pre-Loved<br />Luxury Fashion</h2>
-            <button onClick={() => navigate("/search")} className="mt-3 bg-secondary text-primary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors shadow-card">Shop Now</button>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => navigate("/search")} className="bg-secondary text-primary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors shadow-card">Shop Now</button>
+              <button onClick={() => navigate("/search?filter=rent")} className="bg-transparent border-2 border-secondary text-secondary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/10 transition-colors">Rent Now</button>
+            </div>
           </div>
         </motion.div>
       </div>
