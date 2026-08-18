@@ -26,6 +26,7 @@ const Search = () => {
   const [loading, setLoading] = useState(false);
   const [nearMe, setNearMe] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [listingFilter, setListingFilter] = useState<"all" | "sell" | "rent">("all");
   const imageInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
@@ -99,7 +100,7 @@ const Search = () => {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, [selectedCategory, selectedCondition, selectedSize, priceRange, nearMe]);
+  useEffect(() => { fetchProducts(); }, [selectedCategory, selectedCondition, selectedSize, priceRange, nearMe, listingFilter]);
 
   // Real-time search updates
   useEffect(() => {
@@ -119,6 +120,8 @@ const Search = () => {
     if (selectedCondition !== "All") q = q.eq("condition", selectedCondition);
     if (selectedSize !== "All") q = q.eq("size", selectedSize);
     if (query) q = q.ilike("title", `%${query}%`);
+    if (listingFilter === "rent") q = q.eq("listing_type", "rent");
+    else if (listingFilter === "sell") q = q.in("listing_type", ["sell", "both"]);
 
     // Near Me filter — location se products filter karo
     if (nearMe && userLocation) {
@@ -195,6 +198,20 @@ const Search = () => {
           <Navigation className="w-3 h-3" />
           {nearMe ? "Near Me ✓" : "Near Me"}
         </button>
+
+        {/* Listing Type Filter */}
+        <div className="flex gap-2 mt-2">
+          {[
+            { value: "all", label: "All" },
+            { value: "sell", label: "💰 Buy" },
+            { value: "rent", label: "🔄 Rent" },
+          ].map((f) => (
+            <button key={f.value} onClick={() => setListingFilter(f.value as any)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${listingFilter === f.value ? "bg-secondary text-secondary-foreground" : "bg-secondary/10 text-secondary/70 hover:bg-secondary/20"}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3">
           {categories.map((cat) => (
@@ -305,9 +322,12 @@ const Search = () => {
                 </div>
                 <div className="p-2.5 md:p-3">
                   <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.title}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <p className="text-sm md:text-base font-extrabold text-secondary">₹{item.price.toLocaleString()}</p>
                     {item.original_price && <p className="text-[10px] md:text-xs text-muted-foreground line-through">₹{item.original_price.toLocaleString()}</p>}
+                    {(item as any).listing_type === "rent" && <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full">🔄 Rent</span>}
+                    {(item as any).listing_type === "both" && <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">✨ Buy/Rent</span>}
+                    {(item as any).rent_price_per_day && <span className="text-[9px] text-muted-foreground">₹{(item as any).rent_price_per_day}/day</span>}
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-muted-foreground">
                     <MapPin className="w-2.5 h-2.5" /><span className="text-[10px] md:text-xs">{item.location}</span>

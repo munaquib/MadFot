@@ -32,6 +32,11 @@ const ProductDetail = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [showOfferDialog, setShowOfferDialog] = useState(false);
   const [offerPrice, setOfferPrice] = useState("");
+  const [showRentDialog, setShowRentDialog] = useState(false);
+  const [rentStartDate, setRentStartDate] = useState("");
+  const [rentEndDate, setRentEndDate] = useState("");
+  const [rentDays, setRentDays] = useState(0);
+  const [rentTotal, setRentTotal] = useState(0);
   const [showPromote, setShowPromote] = useState(false);
 
   // Similar items state
@@ -282,6 +287,45 @@ const ProductDetail = () => {
     }
   };
 
+  const calculateRent = (start: string, end: string) => {
+    if (!start || !end) return;
+    const s = new Date(start);
+    const e = new Date(end);
+    const days = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+    if (days < 1) return;
+    setRentDays(days);
+    const total = days * (product?.rent_price_per_day || 0) + (product?.rent_deposit || 0);
+    setRentTotal(total);
+  };
+
+  const handleRentNow = async () => {
+    if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    if (!rentStartDate || !rentEndDate || rentDays < 1) { toast.error("Please select valid rental dates"); return; }
+    if (rentDays < (product?.min_rent_days || 1)) { toast.error(`Minimum ${product?.min_rent_days} days required`); return; }
+    if (rentDays > (product?.max_rent_days || 30)) { toast.error(`Maximum ${product?.max_rent_days} days allowed`); return; }
+
+    try {
+      const { error } = await supabase.from("orders").insert({
+        buyer_id: user.id,
+        seller_id: product.user_id,
+        product_id: product.id,
+        product_title: product.title,
+        price: product.rent_price_per_day * rentDays,
+        order_type: "rental",
+        rental_start_date: rentStartDate,
+        rental_end_date: rentEndDate,
+        rental_days: rentDays,
+        deposit_amount: product.rent_deposit || 0,
+        status: "processing",
+      } as any);
+      if (error) throw error;
+      toast.success("Rental booked successfully! 🎉");
+      setShowRentDialog(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to book rental");
+    }
+  };
+
   if (loading) return <AppLayout><div className="min-h-screen flex items-center justify-center"><div className="text-secondary font-semibold">Loading...</div></div></AppLayout>;
   if (!product) return null;
 
@@ -382,6 +426,13 @@ const ProductDetail = () => {
             <ShieldCheck className="w-3.5 h-3.5 text-secondary" />
             <span className="text-[10px] md:text-xs font-semibold text-secondary">Verified Authentic</span>
           </div>
+          {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
+            <div className="flex items-center gap-2 mb-3 bg-secondary/5 rounded-xl px-3 py-2 border border-secondary/20">
+              <span className="text-sm font-bold text-secondary">🔄 ₹{product.rent_price_per_day}/day</span>
+              {product?.rent_deposit && <span className="text-xs text-muted-foreground">+ ₹{product.rent_deposit} deposit</span>}
+              <span className="text-xs text-muted-foreground ml-auto">{product?.min_rent_days}-{product?.max_rent_days} days</span>
+            </div>
+          )}
           <div className="flex items-center gap-3 text-xs md:text-sm text-muted-foreground mb-4 flex-wrap">
             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {product.location}</span>
             <span>•</span>
@@ -478,6 +529,12 @@ const ProductDetail = () => {
             >
               <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : "Buy Now"}
             </button>
+            {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
+              <button onClick={() => setShowRentDialog(true)}
+                className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-card hover:opacity-90 transition-all duration-200 mt-2">
+                🔄 Rent Now — ₹{product.rent_price_per_day}/day
+              </button>
+            )}
           </div>
 
           {/* WhatsApp Share Button */}
@@ -681,6 +738,58 @@ const ProductDetail = () => {
           onOpenChange={setShowPromote}
           product={product}
         />
+      )}
+      {/* Rent Dialog */}
+      {showRentDialog && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center p-4" onClick={() => setShowRentDialog(false)}>
+          <div className="bg-card rounded-3xl p-6 w-full max-w-md shadow-luxury" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-foreground font-serif mb-1">🔄 Rent This Outfit</h3>
+            <p className="text-xs text-muted-foreground mb-4">₹{product?.rent_price_per_day}/day + ₹{product?.rent_deposit || 0} deposit</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1 block">Start Date</label>
+                <input type="date" value={rentStartDate}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={e => { setRentStartDate(e.target.value); calculateRent(e.target.value, rentEndDate); }}
+                  className="w-full bg-muted/50 border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1 block">End Date</label>
+                <input type="date" value={rentEndDate}
+                  min={rentStartDate || new Date().toISOString().split("T")[0]}
+                  onChange={e => { setRentEndDate(e.target.value); calculateRent(rentStartDate, e.target.value); }}
+                  className="w-full bg-muted/50 border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" />
+              </div>
+              {rentDays > 0 && (
+                <div className="bg-secondary/5 rounded-xl p-3 border border-secondary/20 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Rental ({rentDays} days)</span>
+                    <span className="font-semibold">₹{(product?.rent_price_per_day * rentDays).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Security Deposit</span>
+                    <span className="font-semibold">₹{(product?.rent_deposit || 0).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1 mt-1">
+                    <span>Total</span>
+                    <span className="text-secondary">₹{rentTotal.toLocaleString("en-IN")}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">💡 Deposit refunded after safe return</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setShowRentDialog(false)}
+                  className="flex-1 py-3 glass-card border border-border text-foreground rounded-xl font-semibold text-sm">
+                  Cancel
+                </button>
+                <button onClick={handleRentNow} disabled={rentDays < 1}
+                  className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all">
+                  🔄 Confirm Rental
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </AppLayout>
   );

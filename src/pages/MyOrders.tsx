@@ -12,6 +12,11 @@ interface Order {
   price: number;
   created_at: string;
   status: string;
+  order_type?: string;
+  rental_start_date?: string;
+  rental_end_date?: string;
+  rental_days?: number;
+  deposit_amount?: number;
 }
 
 const getStatusStyle = (status: string) => {
@@ -208,9 +213,24 @@ const MyOrders = () => {
                       <Icon className="w-3 h-3" /> {order.status}
                     </span>
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground">{order.product_title}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-semibold text-foreground">{order.product_title}</h3>
+                    {order.order_type === "rental" && (
+                      <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full shrink-0">🔄 Rental</span>
+                    )}
+                  </div>
+                  {order.order_type === "rental" && order.rental_start_date && (
+                    <p className="text-xs text-muted-foreground mb-1">
+                      📅 {formatDate(order.rental_start_date)} → {formatDate(order.rental_end_date || "")} ({order.rental_days} days)
+                    </p>
+                  )}
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm font-bold text-secondary">₹{order.price?.toLocaleString("en-IN")}</span>
+                    <div>
+                      <span className="text-sm font-bold text-secondary">₹{order.price?.toLocaleString("en-IN")}</span>
+                      {order.order_type === "rental" && order.deposit_amount && (
+                        <span className="text-xs text-muted-foreground ml-2">+ ₹{order.deposit_amount?.toLocaleString("en-IN")} deposit</span>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">{formatDate(order.created_at)}</span>
                   </div>
                 </motion.div>

@@ -36,6 +36,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [featuredItems, setFeaturedItems] = useState<Tables<"products">[]>([]);
   const [recentlyAdded, setRecentlyAdded] = useState<Tables<"products">[]>([]);
+  const [rentItems, setRentItems] = useState<Tables<"products">[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedCondition, setSelectedCondition] = useState("All");
@@ -342,6 +343,35 @@ const Index = () => {
       </div>
 
       <WhyBuyPreLoved />
+
+      {/* Rent Section */}
+      {rentItems.length > 0 && (
+        <div className="px-4 md:px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base md:text-lg font-bold text-foreground font-serif">🔄 Available for Rent</h2>
+            <button onClick={() => navigate("/search?filter=rent")} className="text-xs text-secondary font-medium hover:underline">See all →</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {rentItems.map((item, i) => (
+              <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+                onClick={() => navigate(`/product/${item.id}`)}
+                className="glass-card rounded-2xl overflow-hidden shadow-card border border-secondary/20 cursor-pointer hover:shadow-luxury hover:-translate-y-1 transition-all duration-300 group"
+              >
+                <div className="relative overflow-hidden">
+                  <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy"
+                    className="w-full h-36 md:h-48 object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <span className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full">🔄 RENT</span>
+                </div>
+                <div className="p-2.5">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                  <p className="text-sm font-extrabold text-secondary mt-0.5">₹{(item as any).rent_price_per_day}/day</p>
+                  {(item as any).rent_deposit && <p className="text-[10px] text-muted-foreground">+ ₹{(item as any).rent_deposit} deposit</p>}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* About Section */}
       <div className="px-4 md:px-6 mt-8 mb-4">

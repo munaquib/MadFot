@@ -31,6 +31,11 @@ const Sell = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deliveryAvailable, setDeliveryAvailable] = useState(false);
   const [deliveryCharge, setDeliveryCharge] = useState("");
+  const [listingType, setListingType] = useState<"sell" | "rent" | "both">("sell");
+  const [rentPricePerDay, setRentPricePerDay] = useState("");
+  const [rentDeposit, setRentDeposit] = useState("");
+  const [minRentDays, setMinRentDays] = useState("1");
+  const [maxRentDays, setMaxRentDays] = useState("30");
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
   const [editProductId, setEditProductId] = useState<string | null>(null);
@@ -136,6 +141,11 @@ const Sell = () => {
         longitude: lng || null,
         delivery_available: deliveryAvailable,
         delivery_charge: deliveryAvailable && deliveryCharge ? parseFloat(deliveryCharge) : 0,
+        listing_type: listingType,
+        rent_price_per_day: (listingType === "rent" || listingType === "both") && rentPricePerDay ? parseFloat(rentPricePerDay) : null,
+        rent_deposit: (listingType === "rent" || listingType === "both") && rentDeposit ? parseFloat(rentDeposit) : null,
+        min_rent_days: (listingType === "rent" || listingType === "both") ? parseInt(minRentDays) || 1 : null,
+        max_rent_days: (listingType === "rent" || listingType === "both") ? parseInt(maxRentDays) || 30 : null,
       } as any);
 
       if (insertError) throw insertError;
@@ -286,6 +296,60 @@ const Sell = () => {
               )}
             </div>
           </div>
+
+          {/* Listing Type */}
+          <div className="md:col-span-2">
+            <label className="text-xs font-semibold text-foreground mb-2 block">Listing Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "sell", label: "Sell Only", emoji: "💰" },
+                { value: "rent", label: "Rent Only", emoji: "🔄" },
+                { value: "both", label: "Sell & Rent", emoji: "✨" },
+              ].map((opt) => (
+                <button key={opt.value} type="button"
+                  onClick={() => setListingType(opt.value as any)}
+                  className={`py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${listingType === opt.value ? "border-secondary bg-secondary/10 text-secondary" : "border-border/30 text-muted-foreground"}`}>
+                  {opt.emoji} {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rent Options */}
+          {(listingType === "rent" || listingType === "both") && (
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold text-foreground mb-2 block">🔄 Rent Details</label>
+              <div className="glass-card rounded-xl p-3 border border-secondary/20 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Price per Day (₹)</label>
+                    <input type="number" value={rentPricePerDay} onChange={e => setRentPricePerDay(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Security Deposit (₹)</label>
+                    <input type="number" value={rentDeposit} onChange={e => setRentDeposit(e.target.value)}
+                      placeholder="e.g. 2000"
+                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Min Days</label>
+                    <input type="number" value={minRentDays} onChange={e => setMinRentDays(e.target.value)}
+                      placeholder="1"
+                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Max Days</label>
+                    <input type="number" value={maxRentDays} onChange={e => setMaxRentDays(e.target.value)}
+                      placeholder="30"
+                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">💡 Security deposit will be refunded after item is returned in good condition.</p>
+              </div>
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <label className="text-xs font-semibold text-foreground mb-1 block">Description</label>
