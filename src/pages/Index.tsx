@@ -36,13 +36,10 @@ const Index = () => {
   const navigate = useNavigate();
   const [featuredItems, setFeaturedItems] = useState<Tables<"products">[]>([]);
   const [recentlyAdded, setRecentlyAdded] = useState<Tables<"products">[]>([]);
-  const [rentItems, setRentItems] = useState<Tables<"products">[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedCondition, setSelectedCondition] = useState("All");
   const [maxPrice, setMaxPrice] = useState(100000);
-  const [minPrice, setMinPrice] = useState(0);
-  const [selectedSize, setSelectedSize] = useState("All");
 
   const [totalProducts, setTotalProducts] = useState(0);
   const [avgRating, setAvgRating] = useState("—");
@@ -183,41 +180,25 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Size filter */}
+              {/* Price filter */}
               <div>
-                <p className="text-xs font-semibold text-foreground mb-2">Size</p>
-                <div className="flex flex-wrap gap-2">
-                  {["All", "XS", "S", "M", "L", "XL", "XXL", "Free Size"].map((s) => (
-                    <button key={s} onClick={() => setSelectedSize(s)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${selectedSize === s ? "bg-primary text-secondary" : "bg-muted text-muted-foreground"}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Range filter */}
-              <div>
-                <p className="text-xs font-semibold text-foreground mb-2">Price Range</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Min (₹)</p>
-                    <input type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))}
-                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Max (₹)</p>
-                    <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}
-                      className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
-                  </div>
-                </div>
-                <input type="range" min="0" max="200000" step="1000" value={maxPrice}
+                <p className="text-xs font-semibold text-foreground mb-2">Max Price: ₹{maxPrice.toLocaleString("en-IN")}</p>
+                <input type="range" min="1000" max="200000" step="1000" value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full accent-yellow-600 mt-2" />
+                  className="w-full accent-yellow-600" />
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                min="1000"
+                max="200000"
+                placeholder="Enter max price"
+                className="mt-2 w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              />
               </div>
 
               <button
-                onClick={() => { navigate(`/search?category=${selectedCategory}&condition=${selectedCondition}&size=${selectedSize}&minPrice=${minPrice}&maxPrice=${maxPrice}`); setShowFilters(false); }}
+                onClick={() => { navigate(`/search?category=${selectedCategory}&condition=${selectedCondition}&maxPrice=${maxPrice}`); setShowFilters(false); }}
                 className="w-full py-2.5 bg-primary text-secondary rounded-xl font-bold text-sm hover:opacity-90 transition-all">
                 Apply Filters
               </button>
@@ -235,6 +216,7 @@ const Index = () => {
             <h2 className="text-xl md:text-3xl lg:text-4xl font-extrabold text-secondary font-serif leading-tight mt-1">Buy & Sell Pre-Loved<br />Luxury Fashion</h2>
             <div className="flex gap-2 mt-3">
               <button onClick={() => navigate("/search")} className="bg-secondary text-primary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors shadow-card">Shop Now</button>
+              <button onClick={() => navigate("/sell")} className="bg-secondary text-primary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors shadow-card">Sell Now</button>
               <button onClick={() => navigate("/search?filter=rent")} className="bg-secondary text-primary text-xs md:text-sm font-bold px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors shadow-card">Rent Now</button>
             </div>
           </div>
@@ -364,35 +346,6 @@ const Index = () => {
       </div>
 
       <WhyBuyPreLoved />
-
-      {/* Rent Section */}
-      {rentItems.length > 0 && (
-        <div className="px-4 md:px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base md:text-lg font-bold text-foreground font-serif">🔄 Available for Rent</h2>
-            <button onClick={() => navigate("/search?filter=rent")} className="text-xs text-secondary font-medium hover:underline">See all →</button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {rentItems.map((item, i) => (
-              <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                onClick={() => navigate(`/product/${item.id}`)}
-                className="glass-card rounded-2xl overflow-hidden shadow-card border border-secondary/20 cursor-pointer hover:shadow-luxury hover:-translate-y-1 transition-all duration-300 group"
-              >
-                <div className="relative overflow-hidden">
-                  <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy"
-                    className="w-full h-36 md:h-48 object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <span className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full">🔄 RENT</span>
-                </div>
-                <div className="p-2.5">
-                  <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
-                  <p className="text-sm font-extrabold text-secondary mt-0.5">₹{(item as any).rent_price_per_day}/day</p>
-                  {(item as any).rent_deposit && <p className="text-[10px] text-muted-foreground">+ ₹{(item as any).rent_deposit} deposit</p>}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* About Section */}
       <div className="px-4 md:px-6 mt-8 mb-4">
