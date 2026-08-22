@@ -10,6 +10,47 @@ import LocationPicker from "@/components/LocationPicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
+
+// Upload se pehle image ko resize + compress karta hai (max 1200px width, JPEG 80% quality)
+// Isse seller ki phone camera wali bhaari (5-10MB) photo chhoti (typically 100-300KB) ho jaati hai
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement("img");
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const maxWidth = 1200;
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(file); return; }
+            const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          0.8
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
 const sizes = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
 const conditions = ["New with Tags", "Like New", "Good", "Fair"];
 
@@ -110,14 +151,14 @@ const Sell = () => {
     if (!user) return;
     setSubmitting(true);
     try {
-      // Upload images
+      // Upload images (pehle compress karo, phir upload)
       const uploadedUrls: string[] = [];
       for (const file of images) {
-        const ext = file.name.split(".").pop();
-        const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const compressed = await compressImage(file);
+        const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from("product-images")
-          .upload(path, file);
+          .upload(path, compressed);
         if (uploadError) throw uploadError;
         const { data: urlData } = supabase.storage
           .from("product-images")
