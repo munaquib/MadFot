@@ -16,9 +16,6 @@ import catSherwaniImg from "@/assets/cat-sherwani.jpg";
 import catSareeImg from "@/assets/cat-saree.jpg";
 import catCoatpantImg from "@/assets/cat-coatpant.jpg";
 
-const filterCategories = ["All", "Lehenga", "Sherwani", "Saree", "Coat Pant", "Kurti", "Gown", "Indo-Western"];
-const filterConditions = ["All", "Like New", "Excellent", "Good", "Fair"];
-
 const categories = [
   { img: catLehengaImg, label: "Lehenga", slug: "Lehenga" },
   { img: catSherwaniImg, label: "Sherwani", slug: "Sherwani" },
@@ -46,7 +43,6 @@ const Index = () => {
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
-  // Wishlist IDs fetch karo
   useEffect(() => {
     if (!user) return;
     const fetchWishlist = async () => {
@@ -58,7 +54,6 @@ const Index = () => {
     };
     fetchWishlist();
 
-    // Real-time wishlist sync
     const wlChannel = supabase
       .channel("index-wishlist-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "wishlist", filter: `user_id=eq.${user.id}` },
@@ -97,10 +92,9 @@ const Index = () => {
       .select("*")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(3);
+      .limit(4);
     setRecentlyAdded(recent || []);
 
-    // Real stats
     const { count } = await supabase
       .from("products")
       .select("*", { count: "exact", head: true })
@@ -121,7 +115,6 @@ const Index = () => {
   useEffect(() => {
     fetchProducts();
 
-    // Real-time — naya product add ho toh automatically update ho
     const channel = supabase
       .channel("home-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
@@ -154,7 +147,6 @@ const Index = () => {
                 </button>
               </div>
 
-              {/* Category filter */}
               <div>
                 <p className="text-xs font-semibold text-foreground mb-2">Category</p>
                 <div className="flex flex-wrap gap-2">
@@ -167,7 +159,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Condition filter */}
               <div>
                 <p className="text-xs font-semibold text-foreground mb-2">Condition</p>
                 <div className="flex flex-wrap gap-2">
@@ -180,7 +171,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Price filter */}
               <div>
                 <p className="text-xs font-semibold text-foreground mb-2">Max Price: ₹{maxPrice.toLocaleString("en-IN")}</p>
                 <input type="range" min="1000" max="200000" step="1000" value={maxPrice}
@@ -309,7 +299,7 @@ const Index = () => {
       {/* Sponsored In-Feed */}
       <SponsoredInFeed />
 
-      {/* Recently Added - from DB */}
+      {/* Recently Added - from DB (same card style as Featured Deals for consistency) */}
       <div className="px-4 md:px-6 mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base md:text-lg font-bold text-foreground font-serif">✦ Recently Added</h2>
@@ -318,27 +308,30 @@ const Index = () => {
         {recentlyAdded.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No recent products yet.</p>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {recentlyAdded.map((item, i) => (
-              <motion.div key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
+              <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                 onClick={() => navigate(`/product/${item.id}`)}
-                className="glass-card rounded-2xl p-3 shadow-card flex items-center gap-3 border border-border/30 cursor-pointer hover:shadow-luxury hover:scale-[1.01] transition-all duration-300"
+                className="glass-card rounded-2xl overflow-hidden shadow-card border border-border/30 cursor-pointer hover:shadow-luxury hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group"
               >
-                <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy" className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                  <p className="text-xs md:text-sm font-bold text-secondary mt-0.5">₹{item.price.toLocaleString()}</p>
-                  <div className="flex items-center gap-1 mt-0.5 text-muted-foreground">
+                <div className="relative overflow-hidden">
+                  <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy" className="w-full h-36 md:h-48 lg:h-56 object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <button
+                    onClick={(e) => toggleWishlist(e, item.id)}
+                    className={`absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${wishlistIds.has(item.id) ? "bg-red-500 text-white" : "glass-card text-secondary hover:bg-red-50"}`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
+                  </button>
+                  <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
+                </div>
+                <div className="p-2.5 md:p-3">
+                  <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.title}</p>
+                  <p className="text-sm md:text-base font-extrabold text-secondary mt-0.5">₹{item.price.toLocaleString()}</p>
+                  <div className="flex items-center gap-1 mt-1 text-muted-foreground">
                     <MapPin className="w-2.5 h-2.5" />
                     <span className="text-[10px] md:text-xs">{item.location}</span>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => toggleWishlist(e, item.id)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${wishlistIds.has(item.id) ? "bg-red-500 text-white" : "hover:bg-red-50 text-muted-foreground"}`}
-                >
-                  <Heart className={`w-4 h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
-                </button>
               </motion.div>
             ))}
           </div>
@@ -350,12 +343,10 @@ const Index = () => {
       {/* About Section */}
       <div className="px-4 md:px-6 mt-8 mb-4">
         <div className="glass-card rounded-2xl border border-border/30 shadow-card overflow-hidden">
-          {/* Header */}
           <div className="bg-primary px-5 py-4">
             <h2 className="text-secondary font-bold text-lg font-serif">About MadFod</h2>
             <p className="text-secondary/60 text-xs mt-0.5">India's Premium Pre-Loved Fashion Marketplace</p>
           </div>
-          {/* Content */}
           <div className="p-5 space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
               <span className="font-bold text-foreground">MadFod</span> is India's trusted marketplace for pre-loved ethnic and luxury fashion — lehengas, sherwanis, sarees, gowns, and much more. We believe premium fashion should be accessible to everyone.
@@ -390,7 +381,6 @@ const Index = () => {
                 <p className="text-[10px] text-muted-foreground">User Rating</p>
               </div>
             </div>
-            {/* Footer links */}
             <div className="border-t border-border/30 pt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
               <span onClick={() => navigate("/about")} className="cursor-pointer hover:text-secondary transition-colors">📋 About Us</span>
               <span onClick={() => navigate("/sell-with-us")} className="cursor-pointer hover:text-secondary transition-colors">🤝 Sell With Us</span>

@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 
 // Upload se pehle image ko resize + compress karta hai (max 1200px width, JPEG 80% quality)
-// Isse seller ki phone camera wali bhaari (5-10MB) photo chhoti (typically 100-300KB) ho jaati hai
 const compressImage = (file: File): Promise<File> => {
   return new Promise((resolve, reject) => {
     const img = document.createElement("img");
@@ -63,6 +62,7 @@ const Sell = () => {
   const [price, setPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [category, setCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState("");
   const [location, setLocation] = useState("");
@@ -82,7 +82,6 @@ const Sell = () => {
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [oldPrice, setOldPrice] = useState<number | null>(null);
 
-  // Phone number setup for sellers
   const [myPhone, setMyPhone] = useState<string | null>(null);
   const [showPhoneDialog, setShowPhoneDialog] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
@@ -114,7 +113,8 @@ const Sell = () => {
 
   const handleSubmit = async () => {
     if (!user) return;
-    if (!title || !price || !category) {
+    const finalCategory = category === "Other" ? customCategory.trim() : category;
+    if (!title || !price || !finalCategory) {
       toast.error("Please fill in Title, Price, and Category");
       return;
     }
@@ -131,7 +131,6 @@ const Sell = () => {
     await proceedSubmit();
   };
 
-  // Save phone number, then continue posting the ad
   const handleSavePhoneAndContinue = async () => {
     if (!user) return;
     const trimmed = phoneInput.trim();
@@ -151,7 +150,6 @@ const Sell = () => {
     if (!user) return;
     setSubmitting(true);
     try {
-      // Upload images (pehle compress karo, phir upload)
       const uploadedUrls: string[] = [];
       for (const file of images) {
         const compressed = await compressImage(file);
@@ -166,13 +164,14 @@ const Sell = () => {
         uploadedUrls.push(urlData.publicUrl);
       }
 
-      // Insert product
+      const finalCategory = category === "Other" ? customCategory.trim() : category;
+
       const { error: insertError } = await supabase.from("products").insert({
         user_id: user.id,
         title,
         price: parseInt(price),
         original_price: originalPrice ? parseInt(originalPrice) : null,
-        category,
+        category: finalCategory,
         size: size || null,
         condition: condition || "Good",
         location: location || "Meerut",
@@ -191,7 +190,6 @@ const Sell = () => {
 
       if (insertError) throw insertError;
 
-      // Price drop alert — notify wishlist users if price dropped
       if (editProductId && oldPrice !== null && parseInt(price) < oldPrice) {
         const { data: wishlistUsers } = await supabase
           .from("wishlist")
@@ -285,6 +283,15 @@ const Sell = () => {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             </div>
+            {category === "Other" && (
+              <input
+                type="text"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder="Apni category type karo (e.g. Jacket, Waistcoat)"
+                className="mt-2 w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              />
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold text-foreground mb-1 block">Size</label>
@@ -338,7 +345,6 @@ const Sell = () => {
             </div>
           </div>
 
-          {/* Listing Type */}
           <div className="md:col-span-2">
             <label className="text-xs font-semibold text-foreground mb-2 block">Listing Type</label>
             <div className="grid grid-cols-3 gap-2">
@@ -356,7 +362,6 @@ const Sell = () => {
             </div>
           </div>
 
-          {/* Rent Options */}
           {(listingType === "rent" || listingType === "both") && (
             <div className="md:col-span-2">
               <label className="text-xs font-semibold text-foreground mb-2 block">🔄 Rent Details</label>
@@ -408,7 +413,6 @@ const Sell = () => {
         </button>
       </div>
 
-      {/* Phone Number Setup Dialog */}
       <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
