@@ -6,11 +6,11 @@ const ContactUs = () => {
   const navigate = useNavigate();
 
   const handleWhatsApp = () => {
-    window.open("https://wa.me/919999999999?text=Hi%20MadFod%20Support%2C%20I%20need%20help%20with...", "_blank");
+    window.open("https://wa.me/919229539743?text=Hi%20MadFod%20Support%2C%20I%20need%20help%20with...", "_blank");
   };
 
   const handleEmail = () => {
-    window.open("mailto:support@madfod.com?subject=Support Request", "_blank");
+    window.open("mailto:support.madfod@gmail.com?subject=Support Request", "_blank");
   };
 
   return (
@@ -35,7 +35,7 @@ const ContactUs = () => {
             <div className="text-left">
               <p className="text-sm font-bold text-foreground">WhatsApp Support</p>
               <p className="text-xs text-muted-foreground">Chat with us on WhatsApp</p>
-              <p className="text-xs text-secondary font-semibold mt-0.5">+91 99999 99999</p>
+              <p className="text-xs text-secondary font-semibold mt-0.5">+91 92295 39743</p>
             </div>
           </button>
 
@@ -49,7 +49,7 @@ const ContactUs = () => {
             <div className="text-left">
               <p className="text-sm font-bold text-foreground">Email Support</p>
               <p className="text-xs text-muted-foreground">Send us an email anytime</p>
-              <p className="text-xs text-secondary font-semibold mt-0.5">support@madfod.com</p>
+              <p className="text-xs text-secondary font-semibold mt-0.5">support.madfod@gmail.com</p>
             </div>
           </button>
 
