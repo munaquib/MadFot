@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowLeft, HelpCircle, MessageCircle, Mail, FileText, ChevronRight, ChevronDown, Send } from "lucide-react";
+import { ArrowLeft, HelpCircle, MessageCircle, Mail, FileText, ChevronRight, ChevronDown, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const faqs = [
@@ -19,35 +20,40 @@ const HelpSupport = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showFaqs, setShowFaqs] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [chatMessage, setChatMessage] = useState("");
-  const [chatMessages, setChatMessages] = useState<{ from: string; text: string }[]>([
-    { from: "support", text: "Hi! How can we help you today?" },
-  ]);
   const [reportText, setReportText] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
 
-  const sendChat = () => {
-    if (!chatMessage.trim()) return;
-    setChatMessages((prev) => [...prev, { from: "user", text: chatMessage }]);
-    setChatMessage("");
-    setTimeout(() => {
-      setChatMessages((prev) => [...prev, { from: "support", text: "Thanks for your message! Our team will get back to you shortly." }]);
-    }, 1000);
+  const openWhatsAppChat = () => {
+    window.open("https://wa.me/919229539743?text=Hi%20MadFod%20Support%2C%20I%20need%20help%20with...", "_blank");
   };
 
-  const submitReport = () => {
+  const submitReport = async () => {
     if (!reportText.trim()) return;
-    toast.success("Report submitted! We'll look into it.");
+    if (!user) {
+      toast.error("Please login to submit a report");
+      return;
+    }
+    setSubmittingReport(true);
+    const { error } = await supabase.from("feedback_reports").insert({
+      user_id: user.id,
+      message: reportText.trim(),
+    } as any);
+    setSubmittingReport(false);
+    if (error) {
+      toast.error("Failed to submit report. Please try again.");
+      return;
+    }
+    toast.success("Report submitted! We'll look into it. 🙏");
     setReportText("");
     setShowReport(false);
   };
 
   const helpItems = [
     { icon: FileText, label: "FAQs", desc: "Common questions answered", action: () => setShowFaqs(true) },
-    { icon: MessageCircle, label: "Live Chat", desc: "Chat with our support team", action: () => setShowChat(true) },
-    { icon: Mail, label: "Email Us", desc: "support@MadFod.com", action: () => { window.location.href = "mailto:support@MadFod.com"; } },
+    { icon: MessageCircle, label: "Live Chat", desc: "Chat with us on WhatsApp", action: openWhatsAppChat },
+    { icon: Mail, label: "Email Us", desc: "support.madfod@gmail.com", action: () => { window.location.href = "mailto:support.madfod@gmail.com"; } },
     { icon: HelpCircle, label: "Report a Problem", desc: "Bug reports & feedback", action: () => setShowReport(true) },
   ];
 
@@ -101,30 +107,6 @@ const HelpSupport = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Live Chat Dialog */}
-      <Dialog open={showChat} onOpenChange={setShowChat}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Live Chat</DialogTitle>
-          </DialogHeader>
-          <div className="h-64 overflow-y-auto space-y-2 mb-3 p-2 bg-muted/20 rounded-xl">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${msg.from === "user" ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground"}`}>
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendChat()} placeholder="Type a message..." className="flex-1 bg-muted/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" />
-            <button onClick={sendChat} className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center hover:opacity-90 transition-all">
-              <Send className="w-4 h-4 text-secondary-foreground" />
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Report Dialog */}
       <Dialog open={showReport} onOpenChange={setShowReport}>
         <DialogContent className="max-w-md">
@@ -132,8 +114,8 @@ const HelpSupport = () => {
             <DialogTitle className="font-serif">Report a Problem</DialogTitle>
           </DialogHeader>
           <textarea value={reportText} onChange={(e) => setReportText(e.target.value)} placeholder="Describe the issue or share your feedback..." rows={5} className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50 resize-none" />
-          <button onClick={submitReport} className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-all">
-            Submit Report
+          <button onClick={submitReport} disabled={submittingReport || !reportText.trim()} className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+            {submittingReport ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : "Submit Report"}
           </button>
         </DialogContent>
       </Dialog>
