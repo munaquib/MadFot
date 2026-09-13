@@ -37,22 +37,6 @@ const Profile = () => {
       setOrdersCount(count || 0);
     };
     fetchData();
-
-    // Real-time: profile, listings, orders change pe auto refresh
-    const channel = supabase
-      .channel("profile-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
-        () => { fetchData(); }
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "products", filter: `user_id=eq.${user.id}` },
-        () => { fetchData(); }
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `buyer_id=eq.${user.id}` },
-        () => { fetchData(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || "User";
@@ -109,21 +93,44 @@ const Profile = () => {
               {myListings.slice(0, 5).map((item, i) => (
                 <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
                   onClick={() => navigate(`/product/${item.id}`)}
-                  className="flex items-center gap-3 p-2 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 hover:shadow-sm transition-all duration-200 border border-border/20"
                 >
-                  <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy" className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover" />
-                  <div className="flex-1">
-                    <p className="text-xs md:text-sm font-semibold text-foreground">{item.title}</p>
-                    <p className="text-xs font-bold text-secondary">₹{item.price.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground">{item.views_count || 0} views</p>
+                  {/* Product Image */}
+                  <div className="relative shrink-0">
+                    <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy"
+                      className="w-16 h-16 md:w-18 md:h-18 rounded-xl object-cover shadow-sm" />
+                    <span className={`absolute -top-1 -right-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${item.status === "active" ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+                      {item.status === "active" ? "Live" : item.status}
+                    </span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === "active" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{item.status}</span>
-                  <button onClick={(e) => { e.stopPropagation(); setPromoteProduct(item); }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-secondary/10 transition-colors" title="Promote">
-                    <Megaphone className="w-3.5 h-3.5 text-secondary" />
-                  </button>
-                  <button onClick={(e) => handleDeleteListing(e, item.id)} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-destructive/10 transition-colors" title="Delete listing">
-                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                  </button>
+
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-semibold text-foreground line-clamp-2 leading-tight">{item.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm font-extrabold text-secondary">₹{item.price.toLocaleString()}</p>
+                      {item.original_price && (
+                        <p className="text-[10px] text-muted-foreground line-through">₹{item.original_price.toLocaleString()}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground">👁 {item.views_count || 0} views</p>
+                      <span className="text-[10px] text-muted-foreground">•</span>
+                      <p className="text-[10px] text-muted-foreground">{item.condition}</p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); setPromoteProduct(item); }}
+                      className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors" title="Promote">
+                      <Megaphone className="w-3.5 h-3.5 text-secondary" />
+                    </button>
+                    <button onClick={(e) => handleDeleteListing(e, item.id)}
+                      className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors" title="Delete">
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </button>
+                  </div>
                 </motion.div>
               ))}
             </div>
