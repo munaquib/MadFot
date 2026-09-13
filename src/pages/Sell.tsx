@@ -11,18 +11,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 
-// Upload se pehle image ko resize + compress karta hai (max 1200px width, JPEG 80% quality)
+// Upload se pehle image ko resize + compress karta hai:
+// - Max 1200x1200 (width AND height, jo bhi bada ho use limit karta hai)
+// - JPEG format
+// - Quality 80% se shuru, phir automatically kam karta hai jab tak ~500KB ke aas-paas na aa jaye (max 700KB tak accept)
 const compressImage = (file: File): Promise<File> => {
-  return new Promise((resolve, reject) => {
+  const MAX_DIMENSION = 1200;
+  const TARGET_SIZE = 500 * 1024; // 500KB soft target
+  const HARD_MAX_SIZE = 700 * 1024; // 700KB hard cap — isse zyada quality kam nahi karenge
+
+  return new Promise((resolve) => {
     const img = document.createElement("img");
     const reader = new FileReader();
     reader.onload = (e) => {
       img.onload = () => {
-        const maxWidth = 1200;
         let { width, height } = img;
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        // Chahe width badi ho ya height, dono ko 1200px tak limit karo (aspect ratio maintain karke)
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          if (width >= height) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width = MAX_DIMENSION;
+          } else {
+            width = Math.round((width * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
         }
         const canvas = document.createElement("canvas");
         canvas.width = width;
@@ -30,18 +42,28 @@ const compressImage = (file: File): Promise<File> => {
         const ctx = canvas.getContext("2d");
         if (!ctx) { resolve(file); return; }
         ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) { resolve(file); return; }
-            const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-              type: "image/jpeg",
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          },
-          "image/jpeg",
-          0.8
-        );
+
+        const tryCompress = (quality: number, attempt: number) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { resolve(file); return; }
+              // Agar target size mil gaya, ya quality bahut kam ho gayi (50% se neeche na jaayein), ya 5 attempts ho gaye — stop karo
+              if (blob.size <= TARGET_SIZE || quality <= 0.5 || attempt >= 5 || blob.size <= HARD_MAX_SIZE) {
+                const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                  type: "image/jpeg",
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                // Abhi bhi bahut badi hai, thoda aur quality kam karke try karo
+                tryCompress(quality - 0.1, attempt + 1);
+              }
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        tryCompress(0.8, 1);
       };
       img.onerror = () => resolve(file);
       img.src = e.target?.result as string;
@@ -156,7 +178,11 @@ const Sell = () => {
         const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from("product-images")
-          .upload(path, compressed);
+          .upload(path, compressed, {
+            contentType: "image/jpeg",
+            cacheControl: "31536000",
+            upsert: false,
+          });
         if (uploadError) throw uploadError;
         const { data: urlData } = supabase.storage
           .from("product-images")
