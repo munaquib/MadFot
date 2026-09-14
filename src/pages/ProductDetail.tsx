@@ -39,10 +39,8 @@ const ProductDetail = () => {
   const [rentTotal, setRentTotal] = useState(0);
   const [showPromote, setShowPromote] = useState(false);
 
-  // Similar items state
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
 
-  // Report/Block states
   const [showSellerMenu, setShowSellerMenu] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
@@ -50,7 +48,6 @@ const ProductDetail = () => {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const sellerMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close seller menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (sellerMenuRef.current && !sellerMenuRef.current.contains(e.target as Node)) {
@@ -62,7 +59,6 @@ const ProductDetail = () => {
   }, []);
 
   useEffect(() => {
-    // Problem 2 Fix: page open hone par hamesha upar se start karo
     window.scrollTo(0, 0);
 
     const fetchProduct = async () => {
@@ -72,43 +68,45 @@ const ProductDetail = () => {
         if (data && !error) {
           setProduct(data);
 
-          // Seller profile fetch
           const { data: prof } = await supabase.from("profiles").select("full_name, avg_rating, total_reviews, is_verified").eq("user_id", data.user_id).single();
           if (prof?.full_name) setSellerName(prof.full_name);
           if ((prof as any)?.avg_rating) setSellerAvgRating((prof as any).avg_rating);
           if ((prof as any)?.total_reviews) setSellerTotalReviews((prof as any).total_reviews);
           if ((prof as any)?.is_verified) setSellerIsVerified((prof as any).is_verified);
 
-          // Wishlist check
           if (user) {
             const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
             setInWishlist(!!wl);
           }
 
-          // Track view — fire and forget, loading block nahi karega
-          supabase.rpc("increment_views", { product_id: id }).catch(() => {
-            supabase.from("products").update({ views_count: (data.views_count || 0) + 1 }).eq("id", id).then();
-          });
+          // Track view — fire and forget, loading block nahi karega.
+          // Fix: Supabase queries kabhi "reject" nahi hoti (.catch() ka pichla tarika kabhi
+          // chalta hi nahi tha, chahe increment_views function exist kare ya na kare) —
+          // isliye view count kabhi badhta nahi tha, silently fail ho raha tha.
+          // Ab seedha manual update karte hain aur { error } ko check karke hi log karte hain.
+          supabase
+            .from("products")
+            .update({ views_count: (data.views_count || 0) + 1 })
+            .eq("id", id)
+            .then(({ error: viewErr }) => {
+              if (viewErr) console.error("View count update failed:", viewErr);
+            });
 
-          // Track ad view — fire and forget
           supabase.from("ads").select("id").eq("product_id", id).eq("status", "active").maybeSingle().then(({ data: activeAd }) => {
             if (activeAd?.id) {
               supabase.from("ad_analytics").insert({ ad_id: activeAd.id, event_type: "view", user_id: user?.id || null }).then();
             }
           });
 
-          // Similar items — fire and forget
           if (data.category) {
             supabase.from("products").select("id, title, price, images").eq("category", data.category).neq("id", id).limit(6).then(({ data: similar }) => {
               setSimilarProducts(similar || []);
             });
           }
         } else {
-          // Product not found — sirf console mein log karo
           console.error("Product not found for id:", id);
         }
       } catch (err) {
-        // Problem 1 Fix: toast mat dikhao, sirf console log karo
         console.error("Product fetch error:", err);
       } finally {
         setLoading(false);
@@ -116,7 +114,6 @@ const ProductDetail = () => {
     };
     fetchProduct();
 
-    // Real-time: product price/status/availability change pe auto update
     if (!id) return;
     let channel: any;
     try {
@@ -248,7 +245,6 @@ const ProductDetail = () => {
     navigate("/profile");
   };
 
-  // Report seller
   const handleReportSeller = async () => {
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
     if (!reportReason.trim()) { toast.error("Please select a reason"); return; }
@@ -271,7 +267,6 @@ const ProductDetail = () => {
     }
   };
 
-  // Block seller
   const handleBlockSeller = async () => {
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
     try {
@@ -334,9 +329,7 @@ const ProductDetail = () => {
   return (
     <AppLayout>
       <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:px-2 lg:py-6">
-        {/* Image Section with Carousel — Touch Swipe + Preload Fix */}
         <div className="relative">
-          {/* Preload all images silently so switching is instant */}
           {images.map((src: string, idx: number) => (
             idx !== currentImageIndex && <link key={idx} rel="preload" as="image" href={src} />
           ))}
@@ -355,14 +348,12 @@ const ProductDetail = () => {
               const touch = e.changedTouches[0];
               const dx = touch.clientX - startX;
               const dy = touch.clientY - startY;
-              // Only horizontal swipe (dx > dy)
               if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
                 if (dx < 0) goToNext();
                 else goToPrev();
               }
             }}
           >
-            {/* All images stacked — only current one visible — instant switch no reload */}
             {images.map((src: string, idx: number) => (
               <img
                 key={idx}
@@ -410,7 +401,6 @@ const ProductDetail = () => {
           </div>
         </div>
 
-        {/* Product Info */}
         <div className="px-4 md:px-0 py-4 md:py-0">
           <h1 className="text-lg md:text-2xl font-bold text-foreground font-serif mb-1">{product.title}</h1>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -440,7 +430,6 @@ const ProductDetail = () => {
             {product.size && <><span>•</span><span>Size: {product.size}</span></>}
           </div>
 
-          {/* Delivery Info */}
           {(product as any)?.delivery_available && (
             <div className="flex items-center gap-2 mb-3 bg-emerald-50/50 rounded-xl px-3 py-2 border border-emerald-200/50">
               <Truck className="w-4 h-4 text-emerald-600" />
@@ -459,7 +448,6 @@ const ProductDetail = () => {
             </div>
           )}
 
-          {/* Seller Card with Report/Block menu */}
           <div className="glass-card rounded-2xl p-3 md:p-4 shadow-card border border-border/30 flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">
@@ -475,7 +463,6 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* 3-dot menu — only show if viewer is NOT the seller */}
             {user && product?.user_id !== user.id && (
               <div className="relative" ref={sellerMenuRef}>
                 <button
@@ -537,7 +524,6 @@ const ProductDetail = () => {
             )}
           </div>
 
-          {/* WhatsApp Share Button */}
           <div className="mb-6">
             <button
               onClick={handleShareWhatsApp}
@@ -552,7 +538,6 @@ const ProductDetail = () => {
             </button>
           </div>
 
-          {/* Seller Reviews */}
           {product && (
             <SellerReviews
               sellerId={product.user_id}
@@ -565,7 +550,6 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      {/* Similar Items */}
       {similarProducts.length > 0 && (
         <div className="px-4 md:px-6 py-4">
           <h2 className="text-base font-bold text-foreground font-serif mb-3">Similar Items ✨</h2>
@@ -595,7 +579,6 @@ const ProductDetail = () => {
         </div>
       )}
 
-      {/* Make Offer Dialog */}
       <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
@@ -630,7 +613,6 @@ const ProductDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Report Seller Dialog */}
       <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
@@ -667,7 +649,6 @@ const ProductDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Block Seller Dialog */}
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
@@ -702,7 +683,6 @@ const ProductDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox */}
       <AnimatePresence>
         {lightboxOpen && (
           <motion.div
@@ -731,7 +711,6 @@ const ProductDetail = () => {
         )}
       </AnimatePresence>
 
-      {/* Promote Modal */}
       {product && (
         <PromoteModal
           open={showPromote}
@@ -739,7 +718,6 @@ const ProductDetail = () => {
           product={product}
         />
       )}
-      {/* Rent Dialog */}
       {showRentDialog && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center p-4" onClick={() => setShowRentDialog(false)}>
           <div className="bg-card rounded-3xl p-6 w-full max-w-md shadow-luxury" onClick={e => e.stopPropagation()}>
