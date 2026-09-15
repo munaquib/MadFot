@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 declare global {
   interface Window {
-    Razorpay: any;
+    Cashfree: any;
   }
 }
 
@@ -171,26 +171,32 @@ const ProductDetail = () => {
     await trackAdClick();
     setPaying(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/razorpay-order`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-order`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
+        headers: {
+          "Content-Type": "application/json",
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
         },
-        body: JSON.stringify({ amount: product.price, product_title: product.title }),
+        body: JSON.stringify({
+          amount: product.price,
+          product_title: product.title,
+          buyer_email: user.email || "customer@madfod.com",
+          buyer_name: user.user_metadata?.full_name || "MadFod Customer",
+          buyer_phone: "9999999999",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create order");
-      const options = {
-        key: data.key_id, amount: data.order.amount, currency: data.order.currency, name: "MadFod", description: product.title, order_id: data.order.id,
-        handler: function () { toast.success("Payment successful! 🎉 Order placed."); },
-        prefill: { name: user.user_metadata?.full_name || "", email: user.email || "", contact: "" },
-        theme: { color: "#0F3D2E" },
-        modal: { ondismiss: () => toast.info("Payment cancelled") },
-      };
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+      const cashfree = window.Cashfree({ mode: "production" });
+      cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_modal",
+      }).then((result: any) => {
+        if (result.error) { toast.error("Payment failed: " + result.error.message); }
+        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Order placed."); }
+        else if (result.redirect) { toast.info("Redirecting to payment..."); }
+      });
     } catch (err: any) { toast.error(err.message || "Payment failed"); }
     finally { setPaying(false); }
   };
