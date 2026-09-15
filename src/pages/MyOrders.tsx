@@ -1,4 +1,4 @@
-import { ArrowLeft, Package, Truck, CheckCircle, Clock, ShoppingBag, Sparkles, Bell, MapPin, Shield } from "lucide-react";
+﻿import { ArrowLeft, Package, Truck, CheckCircle, Clock, ShoppingBag, Sparkles, Bell, MapPin, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Order {
   id: string;
   product_title: string;
-  price: number;
+  amount: number;
   created_at: string;
   status: string;
   order_type?: string;
@@ -68,7 +68,7 @@ const TrackingGuide = () => (
             <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Processing</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Your order has been placed! 🎉 Waiting for seller confirmation. You will receive a <span className="font-semibold text-foreground">notification</span> once your order is confirmed.
+            Your order has been placed! ðŸŽ‰ Waiting for seller confirmation. You will receive a <span className="font-semibold text-foreground">notification</span> once your order is confirmed.
           </p>
         </div>
       </div>
@@ -83,7 +83,7 @@ const TrackingGuide = () => (
         </div>
         <div className="pt-1 pb-2">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">In Transit 🚚</span>
+            <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">In Transit ðŸšš</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Your order is on the way! Our delivery partner is heading to your address. A <span className="font-semibold text-foreground">Tracking ID</span> will be sent to your email.
@@ -100,10 +100,10 @@ const TrackingGuide = () => (
         </div>
         <div className="pt-1">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Delivered ✅</span>
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Delivered âœ…</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Your order has been delivered! You can now <span className="font-semibold text-foreground">rate the seller</span> and share your experience. 🌟
+            Your order has been delivered! You can now <span className="font-semibold text-foreground">rate the seller</span> and share your experience. ðŸŒŸ
           </p>
         </div>
       </div>
@@ -216,19 +216,19 @@ const MyOrders = () => {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-sm font-semibold text-foreground">{order.product_title}</h3>
                     {order.order_type === "rental" && (
-                      <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full shrink-0">🔄 Rental</span>
+                      <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full shrink-0">ðŸ”„ Rental</span>
                     )}
                   </div>
                   {order.order_type === "rental" && order.rental_start_date && (
                     <p className="text-xs text-muted-foreground mb-1">
-                      📅 {formatDate(order.rental_start_date)} → {formatDate(order.rental_end_date || "")} ({order.rental_days} days)
+                      ðŸ“… {formatDate(order.rental_start_date)} â†’ {formatDate(order.rental_end_date || "")} ({order.rental_days} days)
                     </p>
                   )}
                   <div className="flex items-center justify-between mt-2">
                     <div>
-                      <span className="text-sm font-bold text-secondary">₹{order.price?.toLocaleString("en-IN")}</span>
+                      <span className="text-sm font-bold text-secondary">â‚¹{order.amount?.toLocaleString("en-IN")}</span>
                       {order.order_type === "rental" && order.deposit_amount && (
-                        <span className="text-xs text-muted-foreground ml-2">+ ₹{order.deposit_amount?.toLocaleString("en-IN")} deposit</span>
+                        <span className="text-xs text-muted-foreground ml-2">+ â‚¹{order.deposit_amount?.toLocaleString("en-IN")} deposit</span>
                       )}
                     </div>
                     <span className="text-xs text-muted-foreground">{formatDate(order.created_at)}</span>
@@ -239,7 +239,7 @@ const MyOrders = () => {
           )}
         </div>
 
-        {/* Tracking Guide — hamesha dikhega */}
+        {/* Tracking Guide â€” hamesha dikhega */}
         <TrackingGuide />
       </div>
     </AppLayout>

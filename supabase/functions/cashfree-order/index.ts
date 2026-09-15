@@ -1,4 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,10 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, product_title, buyer_email, buyer_name, buyer_phone } = await req.json();
+    const { amount, product_title, buyer_email, buyer_name, buyer_phone, product_id, buyer_id, seller_id } = await req.json();
+
+    if (!product_id || !buyer_id || !seller_id) {
+      throw new Error("product_id, buyer_id, seller_id are required");
+    }
 
     const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID")!;
     const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY")!;
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const orderId = `MF_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
@@ -49,6 +58,21 @@ serve(async (req) => {
 
     if (!response.ok) {
       throw new Error(data.message || "Failed to create order");
+    }
+
+    const { error: dbError } = await supabase.from("payment_orders").insert({
+      cf_order_id: orderId,
+      product_id,
+      buyer_id,
+      seller_id,
+      amount,
+      product_title: product_title || "MadFod Purchase",
+      status: "pending",
+    });
+
+    if (dbError) {
+      console.error("payment_orders insert failed:", dbError);
+      throw new Error("Failed to save order reference");
     }
 
     return new Response(
