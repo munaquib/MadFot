@@ -184,9 +184,6 @@ const ProductDetail = () => {
           buyer_email: user.email || "customer@madfod.com",
           buyer_name: user.user_metadata?.full_name || "MadFod Customer",
           buyer_phone: "9999999999",
-          product_id: product.id,
-          buyer_id: user.id,
-          seller_id: product.user_id,
         }),
       });
       const data = await res.json();
