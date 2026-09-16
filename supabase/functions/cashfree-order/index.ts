@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -22,6 +22,14 @@ serve(async (req) => {
     const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY")!;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // DEBUG: confirm ki env vars khaali toh nahi hain (masked, sirf length/prefix dikhayenge)
+    console.log("DEBUG env check:", {
+      hasUrl: !!SUPABASE_URL,
+      urlPrefix: SUPABASE_URL ? SUPABASE_URL.slice(0, 30) : "MISSING",
+      hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+      serviceKeyLength: SUPABASE_SERVICE_ROLE_KEY ? SUPABASE_SERVICE_ROLE_KEY.length : 0,
+    });
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -60,19 +68,38 @@ serve(async (req) => {
       throw new Error(data.message || "Failed to create order");
     }
 
-    const { error: dbError } = await supabase.from("payment_orders").insert({
+    // DEBUG: insert se pehle exact payload log karo
+    console.log("DEBUG inserting payment_orders row:", {
       cf_order_id: orderId,
       product_id,
       buyer_id,
       seller_id,
       amount,
-      product_title: product_title || "MadFod Purchase",
-      status: "pending",
     });
+
+    const { data: insertedRow, error: dbError } = await supabase
+      .from("payment_orders")
+      .insert({
+        cf_order_id: orderId,
+        product_id,
+        buyer_id,
+        seller_id,
+        amount,
+        product_title: product_title || "MadFod Purchase",
+        status: "pending",
+      })
+      .select();
+
+    // DEBUG: insert ke turant baad result log karo (chahe error ho ya na ho)
+    console.log("DEBUG insert result:", { insertedRow, dbError });
 
     if (dbError) {
       console.error("payment_orders insert failed:", dbError);
       throw new Error("Failed to save order reference");
+    }
+
+    if (!insertedRow || insertedRow.length === 0) {
+      console.error("DEBUG: insert returned no error but also no row! Possible RLS/schema issue.");
     }
 
     return new Response(
@@ -84,6 +111,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
+    console.error("cashfree-order error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
