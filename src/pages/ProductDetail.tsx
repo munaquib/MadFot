@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban } from "lucide-react";
+import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban, CheckCircle2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
@@ -28,6 +28,7 @@ const ProductDetail = () => {
   const [sellerTotalReviews, setSellerTotalReviews] = useState(0);
   const [sellerIsVerified, setSellerIsVerified] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
+  const [hasPurchased, setHasPurchased] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [showOfferDialog, setShowOfferDialog] = useState(false);
@@ -77,6 +78,17 @@ const ProductDetail = () => {
           if (user) {
             const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
             setInWishlist(!!wl);
+
+            // Check if this buyer already has an order (non-rental) for this product,
+            // so we can show "Already Purchased" instead of "Buy Now".
+            const { data: existingOrder } = await supabase
+              .from("orders")
+              .select("id")
+              .eq("buyer_id", user.id)
+              .eq("product_id", id)
+              .neq("order_type", "rental")
+              .maybeSingle();
+            setHasPurchased(!!existingOrder);
           }
 
           // Track view — fire and forget, loading block nahi karega.
@@ -184,6 +196,9 @@ const ProductDetail = () => {
           buyer_email: user.email || "customer@madfod.com",
           buyer_name: user.user_metadata?.full_name || "MadFod Customer",
           buyer_phone: "9999999999",
+          product_id: product.id,
+          buyer_id: user.id,
+          seller_id: product.user_id,
         }),
       });
       const data = await res.json();
@@ -194,7 +209,7 @@ const ProductDetail = () => {
         redirectTarget: "_modal",
       }).then((result: any) => {
         if (result.error) { toast.error("Payment failed: " + result.error.message); }
-        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Order placed."); }
+        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Order placed."); setHasPurchased(true); }
         else if (result.redirect) { toast.info("Redirecting to payment..."); }
       });
     } catch (err: any) { toast.error(err.message || "Payment failed"); }
@@ -331,6 +346,7 @@ const ProductDetail = () => {
   if (!product) return null;
 
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
+  const isOwner = !!(user && product?.user_id === user.id);
 
   return (
     <AppLayout>
@@ -501,34 +517,46 @@ const ProductDetail = () => {
             )}
           </div>
 
-          <div className="flex gap-2 mb-2">
-            <button onClick={() => navigate(`/chat?seller_id=${product.user_id}&product_id=${product.id}`)} className="flex-1 py-3 glass-card border-2 border-primary text-primary rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-card hover:bg-primary/5 transition-all duration-200">
-              <MessageCircle className="w-4 h-4" /> Chat
-            </button>
-            <button onClick={() => { if (!user) { toast.error("Please login first"); navigate("/login"); return; } setShowOfferDialog(true); }}
-              className="flex-1 py-3 glass-card border-2 border-secondary text-secondary rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-card hover:bg-secondary/5 transition-all duration-200"
-            >
-              <IndianRupee className="w-4 h-4" /> Make Offer
-            </button>
-          </div>
-          {user && product?.user_id === user.id && (
+          {!isOwner && (
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => navigate(`/chat?seller_id=${product.user_id}&product_id=${product.id}`)} className="flex-1 py-3 glass-card border-2 border-primary text-primary rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-card hover:bg-primary/5 transition-all duration-200">
+                <MessageCircle className="w-4 h-4" /> Chat
+              </button>
+              <button onClick={() => { if (!user) { toast.error("Please login first"); navigate("/login"); return; } setShowOfferDialog(true); }}
+                className="flex-1 py-3 glass-card border-2 border-secondary text-secondary rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-card hover:bg-secondary/5 transition-all duration-200"
+              >
+                <IndianRupee className="w-4 h-4" /> Make Offer
+              </button>
+            </div>
+          )}
+          {isOwner && (
             <button onClick={() => setShowPromote(true)} className="w-full py-3 glass-card border-2 border-secondary text-secondary rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-2 shadow-card hover:bg-secondary/5 transition-all duration-200">
               <Megaphone className="w-4 h-4" /> Promote This Product
             </button>
           )}
-          <div className="mb-6">
-            <button onClick={handleBuyNow} disabled={paying}
-              className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
-            >
-              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : "Buy Now"}
-            </button>
-            {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
-              <button onClick={() => setShowRentDialog(true)}
-                className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-card hover:opacity-90 transition-all duration-200 mt-2">
-                🔄 Rent Now — ₹{product.rent_price_per_day}/day
-              </button>
-            )}
-          </div>
+          {!isOwner && (
+            <div className="mb-6">
+              {hasPurchased ? (
+                <button disabled
+                  className="w-full py-3 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Already Purchased
+                </button>
+              ) : (
+                <button onClick={handleBuyNow} disabled={paying}
+                  className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
+                >
+                  <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : "Buy Now"}
+                </button>
+              )}
+              {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
+                <button onClick={() => setShowRentDialog(true)}
+                  className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-card hover:opacity-90 transition-all duration-200 mt-2">
+                  🔄 Rent Now — ₹{product.rent_price_per_day}/day
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="mb-6">
             <button
