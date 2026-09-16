@@ -53,6 +53,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ received: true, note: "already processed" }), { status: 200 });
     }
 
+    const commission = Math.round(pendingOrder.amount * 0.05 * 100) / 100;
+    const sellerPayout = Math.round((pendingOrder.amount - commission) * 100) / 100;
+
     const { error: orderErr } = await supabase.from("orders").insert({
       buyer_id: pendingOrder.buyer_id,
       seller_id: pendingOrder.seller_id,
@@ -61,6 +64,9 @@ serve(async (req) => {
       status: "processing",
       razorpay_order_id: cfOrderId,
       order_type: "buy",
+      platform_commission: commission,
+      seller_payout_amount: sellerPayout,
+      payout_status: "pending",
     });
 
     if (orderErr) {
