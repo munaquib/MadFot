@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -127,7 +127,7 @@ const AdminDashboard = () => {
     const expiresAt = new Date(now.getTime() + ad.duration_days * 24 * 60 * 60 * 1000);
     const { error } = await supabase.from("ads").update({ status: "active", starts_at: now.toISOString(), expires_at: expiresAt.toISOString() }).eq("id", adId);
     if (error) { toast.error("Failed to approve"); return; }
-    toast.success("Ad approved! âœ…");
+    toast.success("Ad approved! ✅");
     fetchAds(); fetchStats();
   };
 
@@ -148,7 +148,7 @@ const AdminDashboard = () => {
   const handleVerifySeller = async (sellerId: string, currentStatus: boolean) => {
     const { error } = await supabase.from("profiles").update({ is_verified: !currentStatus }).eq("user_id", sellerId);
     if (error) { toast.error("Failed to update"); return; }
-    toast.success(!currentStatus ? "Seller verified! âœ…" : "Verification removed");
+    toast.success(!currentStatus ? "Seller verified! ✅" : "Verification removed");
     fetchSellers();
   };
 
@@ -182,7 +182,7 @@ const AdminDashboard = () => {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
-            { icon: IndianRupee, label: "Revenue", value: `â‚¹${stats.totalRevenue.toLocaleString()}` },
+            { icon: IndianRupee, label: "Revenue", value: `₹${stats.totalRevenue.toLocaleString()}` },
             { icon: Megaphone, label: "Active Ads", value: stats.activeAds },
             { icon: Eye, label: "Total Views", value: stats.totalViews.toLocaleString() },
             { icon: MousePointer, label: "Total Clicks", value: stats.totalClicks.toLocaleString() },
@@ -234,7 +234,7 @@ const AdminDashboard = () => {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${seller.is_verified ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >
                   <BadgeCheck className="w-3.5 h-3.5" />
-                  {seller.is_verified ? "Verified âœ…" : "Verify"}
+                  {seller.is_verified ? "Verified ✅" : "Verify"}
                 </button>
               </motion.div>
             ))}
@@ -244,7 +244,7 @@ const AdminDashboard = () => {
         {/* Reports Tab */}
         {tab === "reports" && (
           <div className="space-y-3">
-            {reports.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No reports yet ðŸ™</p>}
+            {reports.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No reports yet 🙏</p>}
             {reports.map((report, i) => (
               <motion.div key={report.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                 className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
@@ -296,7 +296,7 @@ const AdminDashboard = () => {
                           <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{ad.placement}</span>
                           <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{ad.duration_days}d</span>
                         </div>
-                        <p className="text-xs font-bold text-secondary mt-1">â‚¹{ad.budget}</p>
+                        <p className="text-xs font-bold text-secondary mt-1">₹{ad.budget}</p>
                         <p className="text-[10px] text-muted-foreground">{new Date(ad.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
