@@ -29,6 +29,7 @@ const ProductDetail = () => {
   const [sellerIsVerified, setSellerIsVerified] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [purchaseChecked, setPurchaseChecked] = useState(false);
   const [buyerPhone, setBuyerPhone] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -62,6 +63,7 @@ const ProductDetail = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    setPurchaseChecked(false);
 
     const fetchProduct = async () => {
       if (!id) return;
@@ -120,6 +122,7 @@ const ProductDetail = () => {
             }
 
             setHasPurchased(purchased);
+            setPurchaseChecked(true);
 
             // Buyer ka phone number profile se fetch karo (Cashfree order ke liye use hoga)
             const { data: buyerProf } = await supabase
@@ -128,6 +131,8 @@ const ProductDetail = () => {
               .eq("user_id", user.id)
               .maybeSingle();
             if ((buyerProf as any)?.phone) setBuyerPhone((buyerProf as any).phone);
+          } else {
+            setPurchaseChecked(true);
           }
 
           // Track view — fire and forget, loading block nahi karega.
@@ -586,7 +591,13 @@ const ProductDetail = () => {
           )}
           {!isOwner && (
             <div className="mb-6">
-              {hasPurchased ? (
+              {!purchaseChecked ? (
+                <button disabled
+                  className="w-full py-3 bg-muted text-muted-foreground rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 cursor-not-allowed animate-pulse"
+                >
+                  Checking...
+                </button>
+              ) : hasPurchased ? (
                 <button disabled
                   className="w-full py-3 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 cursor-not-allowed"
                 >
