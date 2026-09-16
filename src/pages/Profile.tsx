@@ -1,4 +1,4 @@
-?import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";

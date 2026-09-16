@@ -1,4 +1,4 @@
-?import { ArrowLeft, Package, Truck, CheckCircle, Clock, ShoppingBag, Sparkles, Bell, MapPin, Shield } from "lucide-react";
+import { ArrowLeft, Package, Truck, CheckCircle, Clock, ShoppingBag, Sparkles, Bell, MapPin, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
