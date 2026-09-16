@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+?import { useState, useEffect } from "react";
 import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -58,7 +58,7 @@ const Profile = () => {
     const { error } = await supabase.from("products").delete().eq("id", productId);
     if (error) { toast.error("Failed to delete"); return; }
     setMyListings((prev) => prev.filter((p) => p.id !== productId));
-    toast.success("Listing deleted! ðŸ—‘ï¸");
+    toast.success("Listing deleted! 🗑️");
   };
 
   return (
@@ -77,7 +77,7 @@ const Profile = () => {
           <h2 className="text-secondary font-bold text-lg md:text-xl mt-2 font-serif">{displayName}</h2>
           <p className="text-secondary/60 text-xs md:text-sm flex items-center gap-1">{(profile as any)?.is_verified ? (<><BadgeCheck className="w-3.5 h-3.5 text-emerald-400" /> <span className="text-emerald-400 font-semibold">Verified Seller</span></>) : (<><Shield className="w-3 h-3" /> Seller</>)}</p>
           <div className="flex gap-6 mt-3">
-            {[{ val: String(myListings.length), label: "Listings" }, { val: String(soldCount), label: "Sold" }, { val: profile?.avg_rating && Number(profile.avg_rating) > 0 ? Number(profile.avg_rating).toFixed(1) : "â€”", label: "Rating" }].map((s) => (
+            {[{ val: String(myListings.length), label: "Listings" }, { val: String(soldCount), label: "Sold" }, { val: profile?.avg_rating && Number(profile.avg_rating) > 0 ? Number(profile.avg_rating).toFixed(1) : "—", label: "Rating" }].map((s) => (
               <div key={s.label} className="text-center">
                 <p className="text-secondary font-bold text-lg">{s.val}</p>
                 <p className="text-secondary/50 text-[10px] md:text-xs">{s.label}</p>
@@ -115,14 +115,14 @@ const Profile = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs md:text-sm font-semibold text-foreground line-clamp-2 leading-tight">{item.title}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-sm font-extrabold text-secondary">â‚¹{item.price.toLocaleString()}</p>
+                      <p className="text-sm font-extrabold text-secondary">₹{item.price.toLocaleString()}</p>
                       {item.original_price && (
-                        <p className="text-[10px] text-muted-foreground line-through">â‚¹{item.original_price.toLocaleString()}</p>
+                        <p className="text-[10px] text-muted-foreground line-through">₹{item.original_price.toLocaleString()}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-muted-foreground">ðŸ‘ {item.views_count || 0} views</p>
-                      <span className="text-[10px] text-muted-foreground">â€¢</span>
+                      <p className="text-[10px] text-muted-foreground">👁 {item.views_count || 0} views</p>
+                      <span className="text-[10px] text-muted-foreground">•</span>
                       <p className="text-[10px] text-muted-foreground">{item.condition}</p>
                     </div>
                   </div>

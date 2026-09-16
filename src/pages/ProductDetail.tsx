@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban } from "lucide-react";
+?import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
@@ -79,9 +79,9 @@ const ProductDetail = () => {
             setInWishlist(!!wl);
           }
 
-          // Track view â€” fire and forget, loading block nahi karega.
+          // Track view — fire and forget, loading block nahi karega.
           // Fix: Supabase queries kabhi "reject" nahi hoti (.catch() ka pichla tarika kabhi
-          // chalta hi nahi tha, chahe increment_views function exist kare ya na kare) â€”
+          // chalta hi nahi tha, chahe increment_views function exist kare ya na kare) —
           // isliye view count kabhi badhta nahi tha, silently fail ho raha tha.
           // Ab seedha manual update karte hain aur { error } ko check karke hi log karte hain.
           supabase
@@ -144,7 +144,7 @@ const ProductDetail = () => {
     } else {
       await supabase.from("wishlist").insert({ user_id: user.id, product_id: id });
       setInWishlist(true);
-      toast.success("Added to wishlist â¤ï¸");
+      toast.success("Added to wishlist ❤️");
     }
   };
 
@@ -197,7 +197,7 @@ const ProductDetail = () => {
         redirectTarget: "_modal",
       }).then((result: any) => {
         if (result.error) { toast.error("Payment failed: " + result.error.message); }
-        else if (result.paymentDetails) { toast.success("Payment successful! ðŸŽ‰ Order placed."); }
+        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Order placed."); }
         else if (result.redirect) { toast.info("Redirecting to payment..."); }
       });
     } catch (err: any) { toast.error(err.message || "Payment failed"); }
@@ -217,7 +217,7 @@ const ProductDetail = () => {
       return;
     }
     const offer = Number(offerPrice);
-    toast.success(`Offer of â‚¹${offer.toLocaleString("en-IN")} sent to ${sellerName}! ðŸŽ‰`);
+    toast.success(`Offer of ₹${offer.toLocaleString("en-IN")} sent to ${sellerName}! 🎉`);
     setShowOfferDialog(false);
     setOfferPrice("");
     navigate(`/chat?seller_id=${product.user_id}&product_id=${product.id}&offer=${offer}`);
@@ -225,12 +225,12 @@ const ProductDetail = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
-    const text = `Check out ${product?.title} on MadFod for â‚¹${product?.price?.toLocaleString("en-IN")}!`;
+    const text = `Check out ${product?.title} on MadFod for ₹${product?.price?.toLocaleString("en-IN")}!`;
     if (navigator.share) {
       try { await navigator.share({ title: product?.title, text, url }); } catch {}
     } else {
       await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard! ðŸ“‹");
+      toast.success("Link copied to clipboard! 📋");
     }
   };
 
@@ -239,7 +239,7 @@ const ProductDetail = () => {
     const url = rawUrl.includes("localhost")
       ? `https://madfod.com/product/${product?.id}`
       : rawUrl;
-    const text = `ðŸ›ï¸ *${product?.title}* â€” MadFod pe sirf â‚¹${product?.price?.toLocaleString("en-IN")} mein!\n\n${product?.description ? product.description.substring(0, 100) + "...\n\n" : ""}ðŸ‘‰ ${url}`;
+    const text = `🛍️ *${product?.title}* — MadFod pe sirf ₹${product?.price?.toLocaleString("en-IN")} mein!\n\n${product?.description ? product.description.substring(0, 100) + "...\n\n" : ""}👉 ${url}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, "_blank");
   };
@@ -250,7 +250,7 @@ const ProductDetail = () => {
     if (!confirmed) return;
     const { error } = await supabase.from("products").delete().eq("id", product.id);
     if (error) { toast.error("Failed to delete listing"); return; }
-    toast.success("Listing deleted successfully! ðŸ—‘ï¸");
+    toast.success("Listing deleted successfully! 🗑️");
     navigate("/profile");
   };
 
@@ -266,7 +266,7 @@ const ProductDetail = () => {
         reason: reportReason,
         type: "seller",
       });
-      toast.success("Report submitted. We'll review it shortly. ðŸ™");
+      toast.success("Report submitted. We'll review it shortly. 🙏");
       setShowReportDialog(false);
       setReportReason("");
     } catch {
@@ -323,7 +323,7 @@ const ProductDetail = () => {
         status: "processing",
       } as any);
       if (error) throw error;
-      toast.success("Rental booked successfully! ðŸŽ‰");
+      toast.success("Rental booked successfully! 🎉");
       setShowRentDialog(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to book rental");
@@ -413,10 +413,10 @@ const ProductDetail = () => {
         <div className="px-4 md:px-0 py-4 md:py-0">
           <h1 className="text-lg md:text-2xl font-bold text-foreground font-serif mb-1">{product.title}</h1>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <span className="text-2xl md:text-3xl font-extrabold text-secondary">â‚¹{product.price.toLocaleString("en-IN")}</span>
+            <span className="text-2xl md:text-3xl font-extrabold text-secondary">₹{product.price.toLocaleString("en-IN")}</span>
             {product.original_price && (
               <>
-                <span className="text-sm text-muted-foreground line-through">â‚¹{product.original_price.toLocaleString("en-IN")}</span>
+                <span className="text-sm text-muted-foreground line-through">₹{product.original_price.toLocaleString("en-IN")}</span>
                 <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{discount}% OFF</span>
               </>
             )}
@@ -427,16 +427,16 @@ const ProductDetail = () => {
           </div>
           {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
             <div className="flex items-center gap-2 mb-3 bg-secondary/5 rounded-xl px-3 py-2 border border-secondary/20">
-              <span className="text-sm font-bold text-secondary">ðŸ”„ â‚¹{product.rent_price_per_day}/day</span>
-              {product?.rent_deposit && <span className="text-xs text-muted-foreground">+ â‚¹{product.rent_deposit} deposit</span>}
+              <span className="text-sm font-bold text-secondary">🔄 ₹{product.rent_price_per_day}/day</span>
+              {product?.rent_deposit && <span className="text-xs text-muted-foreground">+ ₹{product.rent_deposit} deposit</span>}
               <span className="text-xs text-muted-foreground ml-auto">{product?.min_rent_days}-{product?.max_rent_days} days</span>
             </div>
           )}
           <div className="flex items-center gap-3 text-xs md:text-sm text-muted-foreground mb-4 flex-wrap">
             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {product.location}</span>
-            <span>â€¢</span>
+            <span>•</span>
             <span>{product.condition}</span>
-            {product.size && <><span>â€¢</span><span>Size: {product.size}</span></>}
+            {product.size && <><span>•</span><span>Size: {product.size}</span></>}
           </div>
 
           {(product as any)?.delivery_available && (
@@ -444,8 +444,8 @@ const ProductDetail = () => {
               <Truck className="w-4 h-4 text-emerald-600" />
               <span className="text-xs font-semibold text-emerald-700">
                 {(product as any).delivery_charge > 0
-                  ? `Home Delivery Available â€” â‚¹${(product as any).delivery_charge}`
-                  : "Free Home Delivery Available ðŸŽ‰"}
+                  ? `Home Delivery Available — ₹${(product as any).delivery_charge}`
+                  : "Free Home Delivery Available 🎉"}
               </span>
             </div>
           )}
@@ -528,7 +528,7 @@ const ProductDetail = () => {
             {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
               <button onClick={() => setShowRentDialog(true)}
                 className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-card hover:opacity-90 transition-all duration-200 mt-2">
-                ðŸ”„ Rent Now â€” â‚¹{product.rent_price_per_day}/day
+                🔄 Rent Now — ₹{product.rent_price_per_day}/day
               </button>
             )}
           </div>
@@ -561,7 +561,7 @@ const ProductDetail = () => {
 
       {similarProducts.length > 0 && (
         <div className="px-4 md:px-6 py-4">
-          <h2 className="text-base font-bold text-foreground font-serif mb-3">Similar Items âœ¨</h2>
+          <h2 className="text-base font-bold text-foreground font-serif mb-3">Similar Items ✨</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {similarProducts.map((item) => (
               <motion.div
@@ -580,7 +580,7 @@ const ProductDetail = () => {
                 </div>
                 <div className="p-2">
                   <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
-                  <p className="text-xs font-bold text-secondary">â‚¹{item.price?.toLocaleString("en-IN")}</p>
+                  <p className="text-xs font-bold text-secondary">₹{item.price?.toLocaleString("en-IN")}</p>
                 </div>
               </motion.div>
             ))}
@@ -596,10 +596,10 @@ const ProductDetail = () => {
           <div className="space-y-4 pt-2">
             <div className="text-center">
               <p className="text-xs text-muted-foreground mb-1">Listed Price</p>
-              <p className="text-xl font-extrabold text-secondary">â‚¹{product.price.toLocaleString("en-IN")}</p>
+              <p className="text-xl font-extrabold text-secondary">₹{product.price.toLocaleString("en-IN")}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Your Offer Price (â‚¹)</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Your Offer Price (₹)</label>
               <div className="relative">
                 <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -730,8 +730,8 @@ const ProductDetail = () => {
       {showRentDialog && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center p-4" onClick={() => setShowRentDialog(false)}>
           <div className="bg-card rounded-3xl p-6 w-full max-w-md shadow-luxury" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-foreground font-serif mb-1">ðŸ”„ Rent This Outfit</h3>
-            <p className="text-xs text-muted-foreground mb-4">â‚¹{product?.rent_price_per_day}/day + â‚¹{product?.rent_deposit || 0} deposit</p>
+            <h3 className="text-base font-bold text-foreground font-serif mb-1">🔄 Rent This Outfit</h3>
+            <p className="text-xs text-muted-foreground mb-4">₹{product?.rent_price_per_day}/day + ₹{product?.rent_deposit || 0} deposit</p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-foreground mb-1 block">Start Date</label>
@@ -751,17 +751,17 @@ const ProductDetail = () => {
                 <div className="bg-secondary/5 rounded-xl p-3 border border-secondary/20 space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Rental ({rentDays} days)</span>
-                    <span className="font-semibold">â‚¹{(product?.rent_price_per_day * rentDays).toLocaleString("en-IN")}</span>
+                    <span className="font-semibold">₹{(product?.rent_price_per_day * rentDays).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Security Deposit</span>
-                    <span className="font-semibold">â‚¹{(product?.rent_deposit || 0).toLocaleString("en-IN")}</span>
+                    <span className="font-semibold">₹{(product?.rent_deposit || 0).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1 mt-1">
                     <span>Total</span>
-                    <span className="text-secondary">â‚¹{rentTotal.toLocaleString("en-IN")}</span>
+                    <span className="text-secondary">₹{rentTotal.toLocaleString("en-IN")}</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">ðŸ’¡ Deposit refunded after safe return</p>
+                  <p className="text-[10px] text-muted-foreground">💡 Deposit refunded after safe return</p>
                 </div>
               )}
               <div className="flex gap-3">
@@ -771,7 +771,7 @@ const ProductDetail = () => {
                 </button>
                 <button onClick={handleRentNow} disabled={rentDays < 1}
                   className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all">
-                  ðŸ”„ Confirm Rental
+                  🔄 Confirm Rental
                 </button>
               </div>
             </div>
