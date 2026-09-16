@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 serve(async (req) => {
@@ -76,8 +76,8 @@ serve(async (req) => {
 
     await supabase.from("notifications").insert({
       user_id: pendingOrder.seller_id,
-      title: "New Order! ðŸŽ‰",
-      message: `${pendingOrder.product_title} ka order aaya hai â€” check karo My Orders mein.`,
+      title: "New Order! 🎉",
+      message: `${pendingOrder.product_title} ka order aaya hai — check karo My Orders mein.`,
       type: "order",
       is_read: false,
     });
