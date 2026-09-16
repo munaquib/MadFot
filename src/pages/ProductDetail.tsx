@@ -82,14 +82,44 @@ const ProductDetail = () => {
 
             // Check if this buyer already has an order (non-rental) for this product,
             // so we can show "Already Purchased" instead of "Buy Now".
-            const { data: existingOrder } = await supabase
-              .from("orders")
-              .select("id")
-              .eq("buyer_id", user.id)
-              .eq("product_id", id)
-              .neq("order_type", "rental")
-              .maybeSingle();
-            setHasPurchased(!!existingOrder);
+            //
+            // Fix: pehle ye check sirf EK BAAR hota tha. Payment success hone ke turant
+            // baad Cashfree ka modal remount trigger karta hai, aur us waqt tak webhook
+            // ne "orders" table mein row insert nahi kiya hota (usme 1-5 sec lag sakte
+            // hain). Isse "Already Purchased" turant wapas "Buy Now" mein badal jata tha.
+            //
+            // Ab agar user abhi-abhi payment karke aaya hai (sessionStorage flag), toh
+            // ek single check ki jagah kuch retries karte hain (2 sec gap, 6 attempts =
+            // 12 sec tak) jab tak order database mein confirm na ho jaye.
+            const justPurchasedKey = `recent_purchase_${id}`;
+            const justPurchased = sessionStorage.getItem(justPurchasedKey) === "1";
+
+            const checkOrder = async (): Promise<boolean> => {
+              const { data: existingOrder } = await supabase
+                .from("orders")
+                .select("id")
+                .eq("buyer_id", user.id)
+                .eq("product_id", id)
+                .neq("order_type", "rental")
+                .maybeSingle();
+              return !!existingOrder;
+            };
+
+            let purchased = await checkOrder();
+
+            if (purchased) {
+              sessionStorage.removeItem(justPurchasedKey);
+            } else if (justPurchased) {
+              for (let attempt = 0; attempt < 6 && !purchased; attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                purchased = await checkOrder();
+              }
+              if (purchased) {
+                sessionStorage.removeItem(justPurchasedKey);
+              }
+            }
+
+            setHasPurchased(purchased);
 
             // Buyer ka phone number profile se fetch karo (Cashfree order ke liye use hoga)
             const { data: buyerProf } = await supabase
@@ -223,7 +253,13 @@ const ProductDetail = () => {
         redirectTarget: "_modal",
       }).then((result: any) => {
         if (result.error) { toast.error("Payment failed: " + result.error.message); }
-        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Order placed."); setHasPurchased(true); }
+        else if (result.paymentDetails) {
+          toast.success("Payment successful! 🎉 Order placed.");
+          // Fix: flag set karo taaki remount ke baad ka check webhook ka wait kare
+          // (retry kare) instead of turant "Buy Now" pe wapas aa jaane ke.
+          sessionStorage.setItem(`recent_purchase_${product.id}`, "1");
+          setHasPurchased(true);
+        }
         else if (result.redirect) { toast.info("Redirecting to payment..."); }
       });
     } catch (err: any) { toast.error(err.message || "Payment failed"); }
