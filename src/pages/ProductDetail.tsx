@@ -29,6 +29,7 @@ const ProductDetail = () => {
   const [sellerIsVerified, setSellerIsVerified] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [buyerPhone, setBuyerPhone] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [showOfferDialog, setShowOfferDialog] = useState(false);
@@ -89,6 +90,14 @@ const ProductDetail = () => {
               .neq("order_type", "rental")
               .maybeSingle();
             setHasPurchased(!!existingOrder);
+
+            // Buyer ka phone number profile se fetch karo (Cashfree order ke liye use hoga)
+            const { data: buyerProf } = await supabase
+              .from("profiles")
+              .select("phone")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            if ((buyerProf as any)?.phone) setBuyerPhone((buyerProf as any).phone);
           }
 
           // Track view — fire and forget, loading block nahi karega.
@@ -180,6 +189,11 @@ const ProductDetail = () => {
   const handleBuyNow = async () => {
     if (!product) return;
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    if (!buyerPhone) {
+      toast.error("Please add your phone number in Profile before buying");
+      navigate("/profile");
+      return;
+    }
     await trackAdClick();
     setPaying(true);
     try {
@@ -195,7 +209,7 @@ const ProductDetail = () => {
           product_title: product.title,
           buyer_email: user.email || "customer@madfod.com",
           buyer_name: user.user_metadata?.full_name || "MadFod Customer",
-          buyer_phone: "9999999999",
+          buyer_phone: buyerPhone,
           product_id: product.id,
           buyer_id: user.id,
           seller_id: product.user_id,
