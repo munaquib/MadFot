@@ -206,7 +206,8 @@ const MyOrders = () => {
               const { color, icon: Icon } = getStatusStyle(order.status);
               return (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                  className="glass-card rounded-2xl p-4 border border-border/30 shadow-card hover:shadow-luxury transition-all duration-300">
+                  onClick={() => navigate(`/order/${order.id}`)}
+                  className="glass-card rounded-2xl p-4 border border-border/30 shadow-card hover:shadow-luxury transition-all duration-300 cursor-pointer">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-muted-foreground font-medium">{order.id}</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${color}`}>

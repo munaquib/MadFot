@@ -56,18 +56,28 @@ serve(async (req) => {
     const commission = Math.round(pendingOrder.amount * 0.05 * 100) / 100;
     const sellerPayout = Math.round((pendingOrder.amount - commission) * 100) / 100;
 
-    const { error: orderErr } = await supabase.from("orders").insert({
-      buyer_id: pendingOrder.buyer_id,
-      seller_id: pendingOrder.seller_id,
-      product_id: pendingOrder.product_id,
-      amount: pendingOrder.amount,
-      status: "processing",
-      razorpay_order_id: cfOrderId,
-      order_type: "buy",
-      platform_commission: commission,
-      seller_payout_amount: sellerPayout,
-      payout_status: "pending",
-    });
+    const { data: newOrder, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        buyer_id: pendingOrder.buyer_id,
+        seller_id: pendingOrder.seller_id,
+        product_id: pendingOrder.product_id,
+        product_title: pendingOrder.product_title,
+        amount: pendingOrder.amount,
+        status: "processing",
+        razorpay_order_id: cfOrderId,
+        order_type: "buy",
+        platform_commission: commission,
+        seller_payout_amount: sellerPayout,
+        payout_status: "pending",
+        buyer_name: pendingOrder.buyer_name || null,
+        buyer_phone: pendingOrder.buyer_phone || null,
+        delivery_address: pendingOrder.delivery_address || null,
+        delivery_city: pendingOrder.delivery_city || null,
+        delivery_pincode: pendingOrder.delivery_pincode || null,
+      })
+      .select()
+      .single();
 
     if (orderErr) {
       console.error("orders insert failed:", orderErr);
@@ -80,6 +90,7 @@ serve(async (req) => {
       message: `${pendingOrder.product_title} ka order aaya hai — check karo My Orders mein.`,
       type: "order",
       is_read: false,
+      related_order_id: newOrder?.id || null,
     });
 
     await supabase.from("payment_orders").update({ status: "completed" }).eq("cf_order_id", cfOrderId);

@@ -19,6 +19,7 @@ import Notifications from "./pages/Notifications";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import MyOrders from "./pages/MyOrders";
+import OrderDetail from "./pages/OrderDetail";
 import MyReviews from "./pages/MyReviews";
 import VerifyAccount from "./pages/VerifyAccount";
 import Settings from "./pages/Settings";
@@ -76,6 +77,7 @@ const App = () => (
                 <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
                 <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                 <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+                <Route path="/order/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
                 <Route path="/my-reviews" element={<ProtectedRoute><MyReviews /></ProtectedRoute>} />
                 <Route path="/verify-account" element={<ProtectedRoute><VerifyAccount /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

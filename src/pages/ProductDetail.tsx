@@ -41,6 +41,12 @@ const ProductDetail = () => {
   const [rentDays, setRentDays] = useState(0);
   const [rentTotal, setRentTotal] = useState(0);
   const [showPromote, setShowPromote] = useState(false);
+  const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [addressName, setAddressName] = useState("");
+  const [addressPhone, setAddressPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressPincode, setAddressPincode] = useState("");
 
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
 
@@ -221,12 +227,29 @@ const ProductDetail = () => {
     }
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (!product) return;
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
     if (!buyerPhone) {
       toast.error("Please add your phone number in Profile before buying");
       navigate("/profile");
+      return;
+    }
+    // Delivery address lena hai — checkout se pehle ek chhota form dikhate hain,
+    // taaki seller ko pata chale order kaha deliver karna hai.
+    setAddressName(user.user_metadata?.full_name || "");
+    setAddressPhone(buyerPhone);
+    setShowAddressDialog(true);
+  };
+
+  const handleConfirmAddressAndPay = async () => {
+    if (!product || !user) return;
+    if (!addressName.trim() || !addressPhone.trim() || !addressLine.trim() || !addressCity.trim() || !addressPincode.trim()) {
+      toast.error("Please fill all delivery details");
+      return;
+    }
+    if (!/^\d{6}$/.test(addressPincode.trim())) {
+      toast.error("Please enter a valid 6-digit pincode");
       return;
     }
     await trackAdClick();
@@ -243,15 +266,19 @@ const ProductDetail = () => {
           amount: product.price,
           product_title: product.title,
           buyer_email: user.email || "customer@madfod.com",
-          buyer_name: user.user_metadata?.full_name || "MadFod Customer",
-          buyer_phone: buyerPhone,
+          buyer_name: addressName.trim(),
+          buyer_phone: addressPhone.trim(),
           product_id: product.id,
           buyer_id: user.id,
           seller_id: product.user_id,
+          delivery_address: addressLine.trim(),
+          delivery_city: addressCity.trim(),
+          delivery_pincode: addressPincode.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create order");
+      setShowAddressDialog(false);
       const cashfree = window.Cashfree({ mode: "production" });
       cashfree.checkout({
         paymentSessionId: data.payment_session_id,
@@ -704,6 +731,78 @@ const ProductDetail = () => {
               <Send className="w-4 h-4" /> Send Offer
             </button>
             <p className="text-[10px] text-muted-foreground text-center">The seller will be notified of your offer via chat</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg">Delivery Address</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Full Name</label>
+              <input
+                type="text"
+                value={addressName}
+                onChange={(e) => setAddressName(e.target.value)}
+                placeholder="Your name"
+                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone Number</label>
+              <input
+                type="tel"
+                value={addressPhone}
+                onChange={(e) => setAddressPhone(e.target.value)}
+                placeholder="10-digit mobile number"
+                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Address (House no, Street, Area)</label>
+              <textarea
+                value={addressLine}
+                onChange={(e) => setAddressLine(e.target.value)}
+                placeholder="Full delivery address"
+                rows={3}
+                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50 resize-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">City</label>
+                <input
+                  type="text"
+                  value={addressCity}
+                  onChange={(e) => setAddressCity(e.target.value)}
+                  placeholder="City"
+                  className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Pincode</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={addressPincode}
+                  onChange={(e) => setAddressPincode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="6-digit pincode"
+                  className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleConfirmAddressAndPay}
+              disabled={paying}
+              className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
+            >
+              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : `Pay ₹${product?.price?.toLocaleString("en-IN")}`}
+            </button>
+            <p className="text-[10px] text-muted-foreground text-center">Seller ko ye address delivery ke liye dikhega</p>
           </div>
         </DialogContent>
       </Dialog>

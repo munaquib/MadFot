@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Bell, CheckCheck, Package, MessageCircle, Heart, Tag } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +13,7 @@ const typeIcons: Record<string, typeof Bell> = {
 
 const Notifications = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Tables<"notifications">[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,6 +56,15 @@ const Notifications = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
+  const handleNotifClick = (notif: Tables<"notifications">) => {
+    if (!notif.is_read) markAsRead(notif.id);
+    // Order type notification ho aur usse linked order ho, toh seedha order detail pe le jao
+    const relatedOrderId = (notif as any).related_order_id;
+    if (notif.type === "order" && relatedOrderId) {
+      navigate(`/order/${relatedOrderId}`);
+    }
+  };
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
@@ -86,10 +97,11 @@ const Notifications = () => {
           <div className="space-y-2">
             {notifications.map((notif, i) => {
               const Icon = typeIcons[notif.type || "general"] || Bell;
+              const isClickable = notif.type === "order" && !!(notif as any).related_order_id;
               return (
                 <motion.div key={notif.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                  onClick={() => !notif.is_read && markAsRead(notif.id)}
-                  className={`glass-card rounded-2xl p-3.5 shadow-card border cursor-pointer transition-all duration-200 ${notif.is_read ? "border-border/20 opacity-70" : "border-secondary/20 bg-secondary/5"}`}
+                  onClick={() => handleNotifClick(notif)}
+                  className={`glass-card rounded-2xl p-3.5 shadow-card border transition-all duration-200 ${isClickable ? "cursor-pointer hover:shadow-luxury" : "cursor-default"} ${notif.is_read ? "border-border/20 opacity-70" : "border-secondary/20 bg-secondary/5"}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${notif.is_read ? "bg-muted" : "bg-primary"}`}>
@@ -101,6 +113,9 @@ const Notifications = () => {
                       <p className="text-[10px] text-muted-foreground/60 mt-1">
                         {new Date(notif.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </p>
+                      {isClickable && (
+                        <p className="text-[10px] text-secondary font-semibold mt-1">Tap to view order details →</p>
+                      )}
                     </div>
                     {!notif.is_read && <div className="w-2 h-2 rounded-full bg-secondary flex-shrink-0 mt-2" />}
                   </div>
