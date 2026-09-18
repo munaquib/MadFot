@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck } from "lucide-react";
+import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,6 +80,17 @@ const Profile = () => {
     toast.error("Failed to delete");
   };
 
+  const handleRelistListing = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    const { error } = await supabase.from("products").update({ status: "active" }).eq("id", productId);
+    if (error) {
+      toast.error("Failed to relist listing");
+      return;
+    }
+    setMyListings((prev) => prev.map((p) => (p.id === productId ? { ...p, status: "active" } : p)));
+    toast.success("Listing is live again! ✅");
+  };
+
   return (
     <AppLayout>
       <div className="gradient-primary px-4 md:px-6 pt-6 pb-12 rounded-b-[2rem] lg:rounded-b-3xl relative">
@@ -152,7 +163,12 @@ const Profile = () => {
                       className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors" title="Promote">
                       <Megaphone className="w-3.5 h-3.5 text-secondary" />
                     </button>
-                    {item.status !== "inactive" && (
+                    {item.status === "inactive" ? (
+                      <button onClick={(e) => handleRelistListing(e, item.id)}
+                        className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-500/20 transition-colors" title="Relist">
+                        <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                      </button>
+                    ) : (
                       <button onClick={(e) => handleDeleteListing(e, item.id)}
                         className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors" title="Delete">
                         <Trash2 className="w-3.5 h-3.5 text-destructive" />
