@@ -343,9 +343,28 @@ const ProductDetail = () => {
     const confirmed = window.confirm("Are you sure you want to delete this listing?");
     if (!confirmed) return;
     const { error } = await supabase.from("products").delete().eq("id", product.id);
-    if (error) { toast.error("Failed to delete listing"); return; }
-    toast.success("Listing deleted successfully! 🗑️");
-    navigate("/profile");
+    if (!error) {
+      toast.success("Listing deleted successfully! 🗑️");
+      navigate("/profile");
+      return;
+    }
+    // Agar is product pe pehle se koi order ho chuka hai, toh database delete ko
+    // block karta hai (order history preserve karne ke liye — Postgres foreign key
+    // constraint error, code 23503). Us case mein hum product ko permanently delete
+    // karne ki jagah "inactive" kar dete hain — jaise Amazon/Flipkart "unlist" karte
+    // hain. Isse product turant sabko dikhna band ho jata hai, lekin order history
+    // (jo purane buyers ke paas hai) safe rehta hai.
+    if ((error as any).code === "23503") {
+      const { error: updateErr } = await supabase.from("products").update({ status: "inactive" }).eq("id", product.id);
+      if (updateErr) {
+        toast.error("Failed to unlist listing");
+        return;
+      }
+      toast.success("Is product pe orders ho chuke hain, isliye permanently delete nahi ho sakta — listing unlist kar di gayi hai. Ab ye kisi ko nahi dikhegi.");
+      navigate("/profile");
+      return;
+    }
+    toast.error("Failed to delete listing");
   };
 
   const handleReportSeller = async () => {
