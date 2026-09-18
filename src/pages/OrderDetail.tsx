@@ -91,7 +91,8 @@ const OrderDetail = () => {
 
         {/* Product card */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-2xl p-4 border border-border/30 shadow-card mb-4 flex gap-3 items-center">
+          onClick={() => order.product_id && navigate(`/product/${order.product_id}`)}
+          className={`glass-card rounded-2xl p-4 border border-border/30 shadow-card mb-4 flex gap-3 items-center ${order.product_id ? "cursor-pointer hover:shadow-luxury transition-all duration-200" : ""}`}>
           <img src={productImage} alt={order.product_title} className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{order.product_title}</p>
