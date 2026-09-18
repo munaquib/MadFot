@@ -56,9 +56,28 @@ const Profile = () => {
     const confirmed = window.confirm("Are you sure you want to delete this listing?");
     if (!confirmed) return;
     const { error } = await supabase.from("products").delete().eq("id", productId);
-    if (error) { toast.error("Failed to delete"); return; }
-    setMyListings((prev) => prev.filter((p) => p.id !== productId));
-    toast.success("Listing deleted! 🗑️");
+    if (!error) {
+      setMyListings((prev) => prev.filter((p) => p.id !== productId));
+      toast.success("Listing deleted! 🗑️");
+      return;
+    }
+    // Agar is product pe pehle se koi order ho chuka hai, toh database delete ko
+    // block karta hai (order history preserve karne ke liye — Postgres foreign key
+    // constraint error, code 23503). Us case mein hum product ko permanently delete
+    // karne ki jagah "inactive" kar dete hain — jaise Amazon/Flipkart "unlist" karte
+    // hain. Isse product turant sabko dikhna band ho jata hai, lekin order history
+    // (jo purane buyers ke paas hai) safe rehta hai.
+    if ((error as any).code === "23503") {
+      const { error: updateErr } = await supabase.from("products").update({ status: "inactive" }).eq("id", productId);
+      if (updateErr) {
+        toast.error("Failed to unlist listing");
+        return;
+      }
+      setMyListings((prev) => prev.map((p) => (p.id === productId ? { ...p, status: "inactive" } : p)));
+      toast.success("Is product pe orders ho chuke hain, isliye unlist kar di gayi — ab ye kisi ko nahi dikhegi.");
+      return;
+    }
+    toast.error("Failed to delete");
   };
 
   return (
@@ -100,14 +119,14 @@ const Profile = () => {
               {myListings.slice(0, 5).map((item, i) => (
                 <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
                   onClick={() => navigate(`/product/${item.id}`)}
-                  className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 hover:shadow-sm transition-all duration-200 border border-border/20"
+                  className={`flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 hover:shadow-sm transition-all duration-200 border border-border/20 ${item.status === "inactive" ? "opacity-60" : ""}`}
                 >
                   {/* Product Image */}
                   <div className="relative shrink-0">
                     <img src={item.images?.[0] || "/placeholder.svg"} alt={item.title} loading="lazy"
                       className="w-16 h-16 md:w-18 md:h-18 rounded-xl object-cover shadow-sm" />
-                    <span className={`absolute -top-1 -right-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${item.status === "active" ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
-                      {item.status === "active" ? "Live" : item.status}
+                    <span className={`absolute -top-1 -right-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${item.status === "active" ? "bg-emerald-500 text-white" : item.status === "inactive" ? "bg-muted-foreground text-white" : "bg-muted text-muted-foreground"}`}>
+                      {item.status === "active" ? "Live" : item.status === "inactive" ? "Unlisted" : item.status}
                     </span>
                   </div>
 
@@ -133,10 +152,12 @@ const Profile = () => {
                       className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center hover:bg-secondary/20 transition-colors" title="Promote">
                       <Megaphone className="w-3.5 h-3.5 text-secondary" />
                     </button>
-                    <button onClick={(e) => handleDeleteListing(e, item.id)}
-                      className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors" title="Delete">
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </button>
+                    {item.status !== "inactive" && (
+                      <button onClick={(e) => handleDeleteListing(e, item.id)}
+                        className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors" title="Delete">
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               ))}
