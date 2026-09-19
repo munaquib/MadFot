@@ -96,6 +96,9 @@ const OrderDetail = () => {
           <img src={productImage} alt={order.product_title} className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{order.product_title}</p>
+            {isSeller && (
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">Buyer: {order.buyer_name || "Not provided"}</p>
+            )}
             <p className="text-xs text-muted-foreground mt-0.5">{new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
             <span className="text-sm font-bold text-secondary">₹{order.amount?.toLocaleString("en-IN")}</span>
           </div>

@@ -8,6 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface Order {
   id: string;
+  order_number?: string;
+  product_id?: string;
   product_title: string;
   amount: number;
   created_at: string;
@@ -18,6 +20,8 @@ interface Order {
   rental_days?: number;
   deposit_amount?: number;
 }
+
+const statusFlow = ["processing", "shipped", "delivered"];
 
 const getStatusStyle = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -132,7 +136,19 @@ const MyOrders = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [productImages, setProductImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  const fetchImagesForOrders = async (orderList: Order[]) => {
+    const productIds = Array.from(new Set(orderList.map((o) => o.product_id).filter(Boolean))) as string[];
+    if (productIds.length === 0) return;
+    const { data: products } = await supabase.from("products").select("id, images").in("id", productIds);
+    if (products) {
+      const map: Record<string, string> = {};
+      products.forEach((p: any) => { if (p.images?.length) map[p.id] = p.images[0]; });
+      setProductImages((prev) => ({ ...prev, ...map }));
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -146,6 +162,7 @@ const MyOrders = () => {
 
       if (!error && data) {
         setOrders(data as any);
+        fetchImagesForOrders(data as any);
       }
       setLoading(false);
     };
@@ -159,7 +176,9 @@ const MyOrders = () => {
         { event: "*", schema: "public", table: "orders", filter: `buyer_id=eq.${user.id}` },
         (payload: any) => {
           if (payload.eventType === "INSERT") {
-            setOrders((prev) => [payload.new as Order, ...prev]);
+            const newOrder = payload.new as Order;
+            setOrders((prev) => [newOrder, ...prev]);
+            fetchImagesForOrders([newOrder]);
           } else if (payload.eventType === "UPDATE") {
             setOrders((prev) =>
               prev.map((o) => (o.id === payload.new.id ? (payload.new as Order) : o))
@@ -182,7 +201,9 @@ const MyOrders = () => {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <h1 className="text-lg md:text-xl font-bold text-foreground font-serif">My Orders</h1>
-          <span className="ml-auto bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{orders.length}</span>
+          {orders.length > 0 && (
+            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{orders.length} order{orders.length > 1 ? "s" : ""}</span>
+          )}
         </div>
 
         <div className="space-y-3 max-w-2xl mx-auto">
@@ -204,35 +225,66 @@ const MyOrders = () => {
           ) : (
             orders.map((order, i) => {
               const { color, icon: Icon } = getStatusStyle(order.status);
+              const currentStepIndex = statusFlow.indexOf((order.status || "processing").toLowerCase());
+              const isRental = order.order_type === "rental";
               return (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                   onClick={() => navigate(`/order/${order.id}`)}
-                  className="glass-card rounded-2xl p-4 border border-border/30 shadow-card hover:shadow-luxury transition-all duration-300 cursor-pointer">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground font-medium">{order.id}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${color}`}>
+                  className="glass-card rounded-2xl border border-border/30 shadow-card hover:shadow-luxury transition-all duration-300 cursor-pointer overflow-hidden">
+                  {/* Product summary row */}
+                  <div className="p-4 flex gap-3 items-center">
+                    <img
+                      src={(order.product_id && productImages[order.product_id]) || "/placeholder.svg"}
+                      alt={order.product_title}
+                      className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-foreground truncate">{order.product_title}</h3>
+                        {isRental && (
+                          <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full shrink-0">🔄 Rental</span>
+                        )}
+                      </div>
+                      {isRental && order.rental_start_date && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          📅 {formatDate(order.rental_start_date)} → {formatDate(order.rental_end_date || "")} ({order.rental_days} days)
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatDate(order.created_at)}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-sm font-bold text-secondary">₹{order.amount?.toLocaleString("en-IN")}</span>
+                        {isRental && order.deposit_amount && (
+                          <span className="text-[10px] text-muted-foreground">+ ₹{order.deposit_amount?.toLocaleString("en-IN")} deposit</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shrink-0 ${color}`}>
                       <Icon className="w-3 h-3" /> {order.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-semibold text-foreground">{order.product_title}</h3>
-                    {order.order_type === "rental" && (
-                      <span className="text-[9px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded-full shrink-0">🔄 Rental</span>
-                    )}
-                  </div>
-                  {order.order_type === "rental" && order.rental_start_date && (
-                    <p className="text-xs text-muted-foreground mb-1">
-                      📅 {formatDate(order.rental_start_date)} → {formatDate(order.rental_end_date || "")} ({order.rental_days} days)
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between mt-2">
-                    <div>
-                      <span className="text-sm font-bold text-secondary">₹{order.amount?.toLocaleString("en-IN")}</span>
-                      {order.order_type === "rental" && order.deposit_amount && (
-                        <span className="text-xs text-muted-foreground ml-2">+ ₹{order.deposit_amount?.toLocaleString("en-IN")} deposit</span>
-                      )}
+
+                  {/* Status stepper */}
+                  <div className="px-4 pb-4 pt-1 border-t border-border/20">
+                    <div className="flex items-center justify-between mt-3">
+                      {statusFlow.map((step, idx) => {
+                        const reached = idx <= currentStepIndex;
+                        return (
+                          <div key={step} className="flex items-center flex-1">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 ${reached ? "bg-emerald-50 border-emerald-300 text-emerald-600" : "bg-muted border-border text-muted-foreground"}`}>
+                                {step === "processing" && <Clock className="w-3.5 h-3.5" />}
+                                {step === "shipped" && <Truck className="w-3.5 h-3.5" />}
+                                {step === "delivered" && <CheckCircle className="w-3.5 h-3.5" />}
+                              </div>
+                              <span className={`text-[9px] font-semibold capitalize ${reached ? "text-foreground" : "text-muted-foreground"}`}>{step}</span>
+                            </div>
+                            {idx < statusFlow.length - 1 && (
+                              <div className={`h-0.5 flex-1 mx-1 ${idx < currentStepIndex ? "bg-emerald-300" : "bg-border"}`} />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <span className="text-xs text-muted-foreground">{formatDate(order.created_at)}</span>
                   </div>
                 </motion.div>
               );
