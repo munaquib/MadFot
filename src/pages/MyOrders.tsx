@@ -38,6 +38,14 @@ const getStatusStyle = (status: string) => {
   }
 };
 
+// "returned"/"cancelled" internal status values ka user-facing wording alag rakhte
+// hain, taaki buyer ko na lage ki unhone khud kuch kiya hai.
+const getStatusLabel = (status: string) => {
+  if (status?.toLowerCase() === "returned") return "Reset by seller";
+  if (status?.toLowerCase() === "cancelled") return "Cancelled";
+  return status;
+};
+
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -256,7 +264,7 @@ const MyOrders = () => {
                       </div>
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shrink-0 ${color}`}>
-                      <Icon className="w-3 h-3" /> {order.status}
+                      <Icon className="w-3 h-3" /> {getStatusLabel(order.status)}
                     </span>
                   </div>
 

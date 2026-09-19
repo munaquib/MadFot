@@ -19,9 +19,22 @@ const getStatusStyle = (status: string) => {
     case "processing":
     case "pending":
       return { color: "text-red-600 bg-red-50", icon: Clock };
+    case "returned":
+      return { color: "text-muted-foreground bg-muted", icon: Package };
+    case "cancelled":
+      return { color: "text-muted-foreground bg-muted", icon: Package };
     default:
       return { color: "text-muted-foreground bg-muted/50", icon: Package };
   }
+};
+
+// "returned" status sirf internal storage ke liye hai (seller ne product dobara
+// bechne ke liye enable kiya) — buyer ne kuch return nahi kiya, isliye user-facing
+// text mein "returned" word kahin nahi dikhana.
+const getStatusLabel = (status: string) => {
+  if (status?.toLowerCase() === "returned") return "Available for resale";
+  if (status?.toLowerCase() === "cancelled") return "Cancelled";
+  return status;
 };
 
 const OrderDetail = () => {
@@ -103,7 +116,7 @@ const OrderDetail = () => {
             <span className="text-sm font-bold text-secondary">₹{order.amount?.toLocaleString("en-IN")}</span>
           </div>
           <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shrink-0 ${color}`}>
-            <Icon className="w-3 h-3" /> {order.status}
+            <Icon className="w-3 h-3" /> {getStatusLabel(order.status)}
           </span>
         </motion.div>
 
@@ -198,7 +211,7 @@ const OrderDetail = () => {
 
         {isSeller && order.status === "returned" && (
           <div className="text-center py-2">
-            <span className="text-xs font-semibold text-muted-foreground bg-muted px-3 py-1.5 rounded-full">Item marked as returned — available for resale</span>
+            <span className="text-xs font-semibold text-muted-foreground bg-muted px-3 py-1.5 rounded-full">Purchase reset — product is available for sale again</span>
           </div>
         )}
 
