@@ -106,16 +106,22 @@ const ProductDetail = () => {
             const justPurchased = sessionStorage.getItem(justPurchasedKey) === "1";
 
             const checkOrder = async (): Promise<boolean> => {
-              const { data: existingOrder } = await supabase
+              const { data: existingOrders } = await supabase
                 .from("orders")
                 .select("id, status")
                 .eq("buyer_id", user.id)
                 .eq("product_id", id)
                 .neq("order_type", "rental")
-                .maybeSingle();
+                .not("status", "in", "(cancelled,returned)")
+                .order("created_at", { ascending: false })
+                .limit(1);
+              const existingOrder = existingOrders && existingOrders.length > 0 ? existingOrders[0] : null;
               if (existingOrder) {
                 setExistingOrderId(existingOrder.id);
                 setExistingOrderStatus(existingOrder.status);
+              } else {
+                setExistingOrderId(null);
+                setExistingOrderStatus(null);
               }
               return !!existingOrder;
             };
@@ -351,7 +357,7 @@ const ProductDetail = () => {
     if (!confirmed) return;
     setCancelling(true);
     try {
-      const { error } = await supabase.from("orders").delete().eq("id", existingOrderId).eq("buyer_id", user.id);
+      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", existingOrderId).eq("buyer_id", user.id);
       if (error) throw error;
       setHasPurchased(false);
       setExistingOrderId(null);

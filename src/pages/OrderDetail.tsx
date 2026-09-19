@@ -165,7 +165,7 @@ const OrderDetail = () => {
         </motion.div>
 
         {/* Seller actions */}
-        {isSeller && order.status !== "delivered" && (
+        {isSeller && order.status !== "delivered" && order.status !== "cancelled" && order.status !== "returned" && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-3">
             {order.status === "processing" && (
               <button onClick={() => updateStatus("shipped")} disabled={updating}
@@ -180,6 +180,23 @@ const OrderDetail = () => {
               </button>
             )}
           </motion.div>
+        )}
+
+        {/* Item returned — seller ke paas item wapas aa gaya, ab buyer ko dobara "Buy Now" dikhega */}
+        {isSeller && order.status === "delivered" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <button onClick={() => updateStatus("returned")} disabled={updating}
+              className="w-full py-3 border border-border text-foreground rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-muted transition-all flex items-center justify-center gap-2">
+              <Package className="w-4 h-4" /> {updating ? "Updating..." : "Item Returned — Allow Resale"}
+            </button>
+            <p className="text-[10px] text-muted-foreground text-center mt-1.5">Use this if the buyer returned the item and you want to sell it again.</p>
+          </motion.div>
+        )}
+
+        {isSeller && order.status === "returned" && (
+          <div className="text-center py-2">
+            <span className="text-xs font-semibold text-muted-foreground bg-muted px-3 py-1.5 rounded-full">Item marked as returned — available for resale</span>
+          </div>
         )}
 
         {!isSeller && !isBuyer && (
