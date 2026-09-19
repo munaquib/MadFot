@@ -201,9 +201,6 @@ const MyOrders = () => {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <h1 className="text-lg md:text-xl font-bold text-foreground font-serif">My Orders</h1>
-          {orders.length > 0 && (
-            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{orders.length} order{orders.length > 1 ? "s" : ""}</span>
-          )}
         </div>
 
         <div className="space-y-3 max-w-2xl mx-auto">
@@ -229,7 +226,7 @@ const MyOrders = () => {
               const isRental = order.order_type === "rental";
               return (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                  onClick={() => navigate(`/order/${order.id}`)}
+                  onClick={() => order.product_id && navigate(`/product/${order.product_id}`)}
                   className="glass-card rounded-2xl border border-border/30 shadow-card hover:shadow-luxury transition-all duration-300 cursor-pointer overflow-hidden">
                   {/* Product summary row */}
                   <div className="p-4 flex gap-3 items-center">
