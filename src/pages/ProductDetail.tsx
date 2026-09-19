@@ -29,6 +29,9 @@ const ProductDetail = () => {
   const [sellerIsVerified, setSellerIsVerified] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [existingOrderId, setExistingOrderId] = useState<string | null>(null);
+  const [existingOrderStatus, setExistingOrderStatus] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [purchaseChecked, setPurchaseChecked] = useState(false);
   const [buyerPhone, setBuyerPhone] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -105,11 +108,15 @@ const ProductDetail = () => {
             const checkOrder = async (): Promise<boolean> => {
               const { data: existingOrder } = await supabase
                 .from("orders")
-                .select("id")
+                .select("id, status")
                 .eq("buyer_id", user.id)
                 .eq("product_id", id)
                 .neq("order_type", "rental")
                 .maybeSingle();
+              if (existingOrder) {
+                setExistingOrderId(existingOrder.id);
+                setExistingOrderStatus(existingOrder.status);
+              }
               return !!existingOrder;
             };
 
@@ -336,6 +343,25 @@ const ProductDetail = () => {
     const text = `🛍️ *${product?.title}* — MadFod pe sirf ₹${product?.price?.toLocaleString("en-IN")} mein!\n\n${product?.description ? product.description.substring(0, 100) + "...\n\n" : ""}👉 ${url}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, "_blank");
+  };
+
+  const handleCancelOrder = async () => {
+    if (!existingOrderId || !user) return;
+    const confirmed = window.confirm("Are you sure you want to cancel this order?");
+    if (!confirmed) return;
+    setCancelling(true);
+    try {
+      const { error } = await supabase.from("orders").delete().eq("id", existingOrderId).eq("buyer_id", user.id);
+      if (error) throw error;
+      setHasPurchased(false);
+      setExistingOrderId(null);
+      setExistingOrderStatus(null);
+      toast.success("Order cancelled ✅");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to cancel order");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -644,11 +670,20 @@ const ProductDetail = () => {
                   Checking...
                 </button>
               ) : hasPurchased ? (
-                <button disabled
-                  className="w-full py-3 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 cursor-not-allowed"
-                >
-                  <CheckCircle2 className="w-4 h-4" /> Already Purchased
-                </button>
+                <>
+                  <button disabled
+                    className="w-full py-3 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Already Purchased
+                  </button>
+                  {existingOrderStatus === "processing" && (
+                    <button onClick={handleCancelOrder} disabled={cancelling}
+                      className="w-full py-2.5 mt-2 border border-destructive/30 text-destructive rounded-xl font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-destructive/5 transition-all duration-200"
+                    >
+                      {cancelling ? "Cancelling..." : "Cancel Order"}
+                    </button>
+                  )}
+                </>
               ) : (
                 <button onClick={handleBuyNow} disabled={paying}
                   className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
