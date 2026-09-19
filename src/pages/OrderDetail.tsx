@@ -164,8 +164,8 @@ const OrderDetail = () => {
           </div>
         </motion.div>
 
-        {/* Seller actions */}
-        {isSeller && order.status !== "delivered" && order.status !== "cancelled" && order.status !== "returned" && (
+        {/* Seller actions — Mark as Shipped/Delivered (order ko age badhane ke liye) */}
+        {isSeller && (order.status === "processing" || order.status === "shipped") && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-3">
             {order.status === "processing" && (
               <button onClick={() => updateStatus("shipped")} disabled={updating}
@@ -182,14 +182,17 @@ const OrderDetail = () => {
           </motion.div>
         )}
 
-        {/* Item returned — seller ke paas item wapas aa gaya, ab buyer ko dobara "Buy Now" dikhega */}
-        {isSeller && order.status === "delivered" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        {/* Allow resale — order kisi bhi stage mein ho (Processing/Shipped/Delivered), seller
+            jab chahe is buyer ke liye "Already Purchased" ko wapas "Buy Now" bana sakta hai.
+            Ye zaroori nahi ki item wapas aaya ho — ho sakta hai seller ke paas same product
+            ka ek aur piece already ho aur wo usse dobara bechna chahta ho. */}
+        {isSeller && order.status !== "cancelled" && order.status !== "returned" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-3">
             <button onClick={() => updateStatus("returned")} disabled={updating}
               className="w-full py-3 border border-border text-foreground rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-muted transition-all flex items-center justify-center gap-2">
-              <Package className="w-4 h-4" /> {updating ? "Updating..." : "Item Returned — Allow Resale"}
+              <Package className="w-4 h-4" /> {updating ? "Updating..." : "Allow Buyer to Purchase Again"}
             </button>
-            <p className="text-[10px] text-muted-foreground text-center mt-1.5">Use this if the buyer returned the item and you want to sell it again.</p>
+            <p className="text-[10px] text-muted-foreground text-center mt-1.5">Isse ye product is buyer ke liye phir se "Buy Now" ban jayega — item wapas aana zaroori nahi.</p>
           </motion.div>
         )}
 
