@@ -360,8 +360,17 @@ const ProductDetail = () => {
     if (!confirmed) return;
     setCancelling(true);
     try {
-      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", existingOrderId).eq("buyer_id", user.id);
-      if (error) throw error;
+      // Server function pehle courier shipment cancel karta hai, phir order cancel karta hai
+      const { data, error } = await supabase.functions.invoke("cancel-order", { body: { order_id: existingOrderId } });
+      if (error) {
+        let msg = error.message;
+        try {
+          const j = await (error as any).context?.json?.();
+          if (j?.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
       setHasPurchased(false);
       setExistingOrderId(null);
       setExistingOrderStatus(null);
