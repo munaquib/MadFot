@@ -16,6 +16,9 @@ declare global {
   }
 }
 
+// Flat shipping charge (buyer product price ke upar deta hai). Server (cashfree-order) mein bhi yahi value hai.
+const SHIPPING_CHARGE = 100;
+
 const ProductDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -49,6 +52,7 @@ const ProductDetail = () => {
   const [addressPhone, setAddressPhone] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressCity, setAddressCity] = useState("");
+  const [addressState, setAddressState] = useState("");
   const [addressPincode, setAddressPincode] = useState("");
 
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
@@ -257,7 +261,7 @@ const ProductDetail = () => {
 
   const handleConfirmAddressAndPay = async () => {
     if (!product || !user) return;
-    if (!addressName.trim() || !addressPhone.trim() || !addressLine.trim() || !addressCity.trim() || !addressPincode.trim()) {
+    if (!addressName.trim() || !addressPhone.trim() || !addressLine.trim() || !addressCity.trim() || !addressState.trim() || !addressPincode.trim()) {
       toast.error("Please fill all delivery details");
       return;
     }
@@ -268,6 +272,7 @@ const ProductDetail = () => {
     await trackAdClick();
     setPaying(true);
     try {
+      // Amount yahan se nahi bhejte: server database se product price + shipping khud calculate karta hai.
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-order`, {
         method: "POST",
         headers: {
@@ -276,16 +281,14 @@ const ProductDetail = () => {
           "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
         },
         body: JSON.stringify({
-          amount: product.price,
-          product_title: product.title,
+          product_id: product.id,
+          buyer_id: user.id,
           buyer_email: user.email || "customer@madfod.com",
           buyer_name: addressName.trim(),
           buyer_phone: addressPhone.trim(),
-          product_id: product.id,
-          buyer_id: user.id,
-          seller_id: product.user_id,
           delivery_address: addressLine.trim(),
           delivery_city: addressCity.trim(),
+          delivery_state: addressState.trim(),
           delivery_pincode: addressPincode.trim(),
         }),
       });
@@ -480,6 +483,7 @@ const ProductDetail = () => {
 
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
   const isOwner = !!(user && product?.user_id === user.id);
+  const totalPayable = (product?.price || 0) + SHIPPING_CHARGE;
 
   return (
     <AppLayout>
@@ -585,13 +589,11 @@ const ProductDetail = () => {
             {product.size && <><span>•</span><span>Size: {product.size}</span></>}
           </div>
 
-          {(product as any)?.delivery_available && (
+          {product?.listing_type !== "rent" && (
             <div className="flex items-center gap-2 mb-3 bg-emerald-50/50 rounded-xl px-3 py-2 border border-emerald-200/50">
               <Truck className="w-4 h-4 text-emerald-600" />
               <span className="text-xs font-semibold text-emerald-700">
-                {(product as any).delivery_charge > 0
-                  ? `Home Delivery Available — ₹${(product as any).delivery_charge}`
-                  : "Free Home Delivery Available 🎉"}
+                Home Delivery by MadFod — ₹{SHIPPING_CHARGE}
               </span>
             </div>
           )}
@@ -796,7 +798,7 @@ const ProductDetail = () => {
       </Dialog>
 
       <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
-        <DialogContent className="max-w-sm mx-auto">
+        <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-lg">Delivery Address</DialogTitle>
           </DialogHeader>
@@ -843,26 +845,52 @@ const ProductDetail = () => {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Pincode</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">State</label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={addressPincode}
-                  onChange={(e) => setAddressPincode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="6-digit pincode"
+                  value={addressState}
+                  onChange={(e) => setAddressState(e.target.value)}
+                  placeholder="State"
                   className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
                 />
               </div>
             </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Pincode</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={addressPincode}
+                onChange={(e) => setAddressPincode(e.target.value.replace(/\D/g, ""))}
+                placeholder="6-digit pincode"
+                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              />
+            </div>
+
+            <div className="bg-secondary/5 rounded-xl p-3 border border-secondary/20 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Product</span>
+                <span className="font-semibold">₹{product?.price?.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Delivery</span>
+                <span className="font-semibold">₹{SHIPPING_CHARGE}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1 mt-1">
+                <span>Total</span>
+                <span className="text-secondary">₹{totalPayable.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+
             <button
               onClick={handleConfirmAddressAndPay}
               disabled={paying}
               className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
             >
-              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : `Pay ₹${product?.price?.toLocaleString("en-IN")}`}
+              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : `Pay ₹${totalPayable.toLocaleString("en-IN")}`}
             </button>
-            <p className="text-[10px] text-muted-foreground text-center">Seller ko ye address delivery ke liye dikhega</p>
+            <p className="text-[10px] text-muted-foreground text-center">Courier isi address pe parcel deliver karega</p>
           </div>
         </DialogContent>
       </Dialog>

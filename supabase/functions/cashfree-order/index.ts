@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Flat shipping charge jo buyer deta hai (product price ke upar)
+const SHIPPING_CHARGE = 100;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -13,12 +16,15 @@ serve(async (req) => {
 
   try {
     const {
-      amount, product_title, buyer_email, buyer_name, buyer_phone, product_id, buyer_id, seller_id,
-      delivery_address, delivery_city, delivery_pincode,
+      product_id, buyer_id, buyer_email, buyer_name, buyer_phone,
+      delivery_address, delivery_city, delivery_state, delivery_pincode,
     } = await req.json();
 
-    if (!product_id || !buyer_id || !seller_id) {
-      throw new Error("product_id, buyer_id, seller_id are required");
+    if (!product_id || !buyer_id) {
+      throw new Error("product_id and buyer_id are required");
+    }
+    if (!delivery_address || !delivery_city || !delivery_state || !delivery_pincode) {
+      throw new Error("Complete delivery address is required");
     }
 
     const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID")!;
@@ -28,11 +34,32 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Price browser se nahi, database se padhte hain (taaki koi amount change na kar sake)
+    const { data: product, error: productErr } = await supabase
+      .from("products")
+      .select("id, title, price, user_id, status")
+      .eq("id", product_id)
+      .single();
+
+    if (productErr || !product) {
+      throw new Error("Product not found");
+    }
+    if (product.status !== "active") {
+      throw new Error("Ye product ab available nahi hai");
+    }
+    if (product.user_id === buyer_id) {
+      throw new Error("Aap apna hi product nahi khareed sakte");
+    }
+
+    const itemPrice = Number(product.price);
+    const totalAmount = itemPrice + SHIPPING_CHARGE;
+    const seller_id = product.user_id;
+
     const orderId = `MF_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
     const orderPayload = {
       order_id: orderId,
-      order_amount: amount,
+      order_amount: totalAmount,
       order_currency: "INR",
       customer_details: {
         customer_id: `cust_${Date.now()}`,
@@ -43,7 +70,7 @@ serve(async (req) => {
       order_meta: {
         return_url: `https://madfod.com/payment-success?order_id=${orderId}`,
       },
-      order_note: product_title || "MadFod Purchase",
+      order_note: product.title || "MadFod Purchase",
     };
 
     const response = await fetch("https://api.cashfree.com/pg/orders", {
@@ -63,6 +90,7 @@ serve(async (req) => {
       throw new Error(data.message || "Failed to create order");
     }
 
+    // amount = total jo buyer ne diya (price + shipping). shipping_charge alag save hota hai.
     const { data: insertedRow, error: dbError } = await supabase
       .from("payment_orders")
       .insert({
@@ -70,13 +98,15 @@ serve(async (req) => {
         product_id,
         buyer_id,
         seller_id,
-        amount,
-        product_title: product_title || "MadFod Purchase",
+        amount: totalAmount,
+        shipping_charge: SHIPPING_CHARGE,
+        product_title: product.title || "MadFod Purchase",
         status: "pending",
         buyer_name: buyer_name || null,
         buyer_phone: buyer_phone || null,
         delivery_address: delivery_address || null,
         delivery_city: delivery_city || null,
+        delivery_state: delivery_state || null,
         delivery_pincode: delivery_pincode || null,
       })
       .select();
