@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Camera, Image, ChevronDown, X, Loader2, Truck, Phone } from "lucide-react";
+import { Camera, Image, ChevronDown, X, Loader2, Truck, Phone, MapPin } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
@@ -10,6 +10,9 @@ import LocationPicker from "@/components/LocationPicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
+
+// Flat shipping charge jo buyer deta hai (MadFod courier se pickup + delivery karata hai)
+const SHIPPING_CHARGE = 100;
 
 // Upload se pehle image ko resize + compress karta hai:
 // - Max 1200x1200 (width AND height, jo bhi bada ho use limit karta hai)
@@ -75,6 +78,20 @@ const compressImage = (file: File): Promise<File> => {
 const sizes = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
 const conditions = ["New with Tags", "Like New", "Good", "Fair"];
 
+type PickupForm = {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
+const emptyPickup: PickupForm = { name: "", phone: "", address: "", city: "", state: "", pincode: "" };
+
+const isPickupComplete = (p: PickupForm) =>
+  !!(p.name.trim() && p.phone.trim().length >= 10 && p.address.trim() && p.city.trim() && p.state.trim() && /^\d{6}$/.test(p.pincode.trim()));
+
 const Sell = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -92,8 +109,6 @@ const Sell = () => {
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [deliveryAvailable, setDeliveryAvailable] = useState(false);
-  const [deliveryCharge, setDeliveryCharge] = useState("");
   const [listingType, setListingType] = useState<"sell" | "rent" | "both">("sell");
   const [rentPricePerDay, setRentPricePerDay] = useState("");
   const [rentDeposit, setRentDeposit] = useState("");
@@ -108,11 +123,31 @@ const Sell = () => {
   const [showPhoneDialog, setShowPhoneDialog] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
 
+  // Seller ka pickup address (courier yahin se parcel uthayega)
+  const [pickup, setPickup] = useState<PickupForm>(emptyPickup);
+  const [showPickupDialog, setShowPickupDialog] = useState(false);
+  const [savingPickup, setSavingPickup] = useState(false);
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("phone").eq("user_id", user.id).single().then(({ data }) => {
-      if (data) setMyPhone((data as any).phone || null);
-    });
+    supabase
+      .from("profiles")
+      .select("phone, pickup_name, pickup_phone, pickup_address, pickup_city, pickup_state, pickup_pincode")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        const d = data as any;
+        setMyPhone(d.phone || null);
+        setPickup({
+          name: d.pickup_name || "",
+          phone: d.pickup_phone || d.phone || "",
+          address: d.pickup_address || "",
+          city: d.pickup_city || "",
+          state: d.pickup_state || "",
+          pincode: d.pickup_pincode || "",
+        });
+      });
   }, [user]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,6 +168,15 @@ const Sell = () => {
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Phone aur pickup address dono ho jaye tabhi listing post hogi
+  const continueAfterPhone = async () => {
+    if (!isPickupComplete(pickup)) {
+      setShowPickupDialog(true);
+      return;
+    }
+    await proceedSubmit();
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
     const finalCategory = category === "Other" ? customCategory.trim() : category;
@@ -150,7 +194,7 @@ const Sell = () => {
       return;
     }
 
-    await proceedSubmit();
+    await continueAfterPhone();
   };
 
   const handleSavePhoneAndContinue = async () => {
@@ -163,8 +207,44 @@ const Sell = () => {
     const { error } = await supabase.from("profiles").update({ phone: trimmed } as any).eq("user_id", user.id);
     if (error) { toast.error("Failed to save number"); return; }
     setMyPhone(trimmed);
+    setPickup((p) => ({ ...p, phone: p.phone || trimmed }));
     setShowPhoneDialog(false);
     toast.success("Number saved! 📞");
+    // pickup phone ab state se nahi, seedha naye number se check karo
+    const withPhone = { ...pickup, phone: pickup.phone || trimmed };
+    if (!isPickupComplete(withPhone)) {
+      setShowPickupDialog(true);
+      return;
+    }
+    await proceedSubmit();
+  };
+
+  const handleSavePickupAndContinue = async () => {
+    if (!user) return;
+    if (!pickup.name.trim()) { toast.error("Naam daalo"); return; }
+    if (pickup.phone.trim().length < 10) { toast.error("Sahi phone number daalo"); return; }
+    if (!pickup.address.trim()) { toast.error("Pickup address daalo"); return; }
+    if (!pickup.city.trim()) { toast.error("City daalo"); return; }
+    if (!pickup.state.trim()) { toast.error("State daalo"); return; }
+    if (!/^\d{6}$/.test(pickup.pincode.trim())) { toast.error("6 digit ka sahi pincode daalo"); return; }
+
+    setSavingPickup(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        pickup_name: pickup.name.trim(),
+        pickup_phone: pickup.phone.trim(),
+        pickup_address: pickup.address.trim(),
+        pickup_city: pickup.city.trim(),
+        pickup_state: pickup.state.trim(),
+        pickup_pincode: pickup.pincode.trim(),
+      } as any)
+      .eq("user_id", user.id);
+    setSavingPickup(false);
+    if (error) { toast.error("Address save nahi hua, dobara try karo"); return; }
+
+    setShowPickupDialog(false);
+    toast.success("Pickup address saved! 📦");
     await proceedSubmit();
   };
 
@@ -205,8 +285,8 @@ const Sell = () => {
         images: uploadedUrls,
         latitude: lat || null,
         longitude: lng || null,
-        delivery_available: deliveryAvailable,
-        delivery_charge: deliveryAvailable && deliveryCharge ? parseFloat(deliveryCharge) : 0,
+        delivery_available: true,
+        delivery_charge: SHIPPING_CHARGE,
         listing_type: listingType,
         rent_price_per_day: (listingType === "rent" || listingType === "both") && rentPricePerDay ? parseFloat(rentPricePerDay) : null,
         rent_deposit: (listingType === "rent" || listingType === "both") && rentDeposit ? parseFloat(rentDeposit) : null,
@@ -240,6 +320,9 @@ const Sell = () => {
       setSubmitting(false);
     }
   };
+
+  const inputClass =
+    "w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30";
 
   return (
     <AppLayout>
@@ -352,22 +435,13 @@ const Sell = () => {
 
           <div className="md:col-span-2">
             <label className="text-xs font-semibold text-foreground mb-2 block flex items-center gap-2">
-              <Truck className="w-4 h-4" /> Delivery Options
+              <Truck className="w-4 h-4" /> Delivery
             </label>
-            <div className="glass-card rounded-xl p-3 border border-border/30 space-y-2">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={deliveryAvailable} onChange={e => setDeliveryAvailable(e.target.checked)}
-                  className="w-4 h-4 accent-yellow-600" />
-                <span className="text-sm text-foreground">Offer Home Delivery</span>
-              </label>
-              {deliveryAvailable && (
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Delivery Charge (₹) — enter 0 for free delivery</label>
-                  <input type="number" value={deliveryCharge} onChange={e => setDeliveryCharge(e.target.value)}
-                    placeholder="e.g. 100"
-                    className="w-full glass-card border border-border/50 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30" />
-                </div>
-              )}
+            <div className="glass-card rounded-xl p-3 border border-border/30 space-y-1">
+              <p className="text-sm text-foreground">MadFod aapka parcel courier se buyer tak pahunchayega.</p>
+              <p className="text-xs text-muted-foreground">
+                Buyer ₹{SHIPPING_CHARGE} shipping deta hai. Aapko kuch nahi dena, aur koi commission bhi nahi. Courier aapke pickup address se parcel le jayega.
+              </p>
             </div>
           </div>
 
@@ -439,6 +513,7 @@ const Sell = () => {
         </button>
       </div>
 
+      {/* Phone number dialog */}
       <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
@@ -456,14 +531,85 @@ const Sell = () => {
               onChange={(e) => setPhoneInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSavePhoneAndContinue()}
               placeholder="+91 XXXXX XXXXX"
-              className="w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              className={inputClass}
             />
             <button
               onClick={handleSavePhoneAndContinue}
               disabled={!phoneInput.trim() || submitting}
               className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
             >
-              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : <><Phone className="w-4 h-4" /> Save & Post Ad</>}
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : <><Phone className="w-4 h-4" /> Save & Continue</>}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pickup address dialog */}
+      <Dialog open={showPickupDialog} onOpenChange={setShowPickupDialog}>
+        <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-secondary" /> Pickup Address
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Order aane par courier is address se parcel uthayega. Ek baar bharna hai, agli listings ke liye yahi use hoga.
+            </p>
+            <input
+              type="text"
+              value={pickup.name}
+              onChange={(e) => setPickup({ ...pickup, name: e.target.value })}
+              placeholder="Aapka naam"
+              className={inputClass}
+            />
+            <input
+              type="tel"
+              value={pickup.phone}
+              onChange={(e) => setPickup({ ...pickup, phone: e.target.value })}
+              placeholder="Phone number (courier isi pe call karega)"
+              className={inputClass}
+            />
+            <textarea
+              rows={2}
+              value={pickup.address}
+              onChange={(e) => setPickup({ ...pickup, address: e.target.value })}
+              placeholder="Ghar / flat no, gali, area, landmark"
+              className={`${inputClass} resize-none`}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={pickup.city}
+                onChange={(e) => setPickup({ ...pickup, city: e.target.value })}
+                placeholder="City"
+                className={inputClass}
+              />
+              <input
+                type="text"
+                value={pickup.state}
+                onChange={(e) => setPickup({ ...pickup, state: e.target.value })}
+                placeholder="State"
+                className={inputClass}
+              />
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={pickup.pincode}
+              onChange={(e) => setPickup({ ...pickup, pincode: e.target.value.replace(/\D/g, "") })}
+              placeholder="Pincode (6 digit)"
+              className={inputClass}
+            />
+            <button
+              onClick={handleSavePickupAndContinue}
+              disabled={savingPickup || submitting}
+              className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {savingPickup || submitting
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                : <><MapPin className="w-4 h-4" /> Save & Post Ad</>}
             </button>
           </div>
         </DialogContent>
