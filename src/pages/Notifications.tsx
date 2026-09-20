@@ -98,13 +98,30 @@ const Notifications = () => {
             {notifications.map((notif, i) => {
               const Icon = typeIcons[notif.type || "general"] || Bell;
               const isClickable = notif.type === "order" && !!(notif as any).related_order_id;
+              const imageUrl = (notif as any).image_url as string | null;
               return (
                 <motion.div key={notif.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                   onClick={() => handleNotifClick(notif)}
                   className={`glass-card rounded-2xl p-3.5 shadow-card border transition-all duration-200 ${isClickable ? "cursor-pointer hover:shadow-luxury" : "cursor-default"} ${notif.is_read ? "border-border/20 opacity-70" : "border-secondary/20 bg-secondary/5"}`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${notif.is_read ? "bg-muted" : "bg-primary"}`}>
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={notif.title || "Product"}
+                        loading="lazy"
+                        className="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-border/30"
+                        onError={(e) => {
+                          // Image load fail ho jaye toh fallback icon dikhao
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                          const fallback = (e.currentTarget.nextSibling as HTMLElement | null);
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-9 h-9 rounded-full items-center justify-center flex-shrink-0 ${notif.is_read ? "bg-muted" : "bg-primary"} ${imageUrl ? "hidden" : "flex"}`}
+                    >
                       <Icon className={`w-4 h-4 ${notif.is_read ? "text-muted-foreground" : "text-secondary"}`} />
                     </div>
                     <div className="flex-1 min-w-0">

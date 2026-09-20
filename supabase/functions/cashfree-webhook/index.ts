@@ -242,6 +242,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to create order" }), { status: 500 });
     }
 
+    // Product ki pehli image nikalo, taaki notification mein dikhe
+    let productImageUrl: string | null = null;
+    const { data: productRow } = await supabase
+      .from("products")
+      .select("images")
+      .eq("id", pendingOrder.product_id)
+      .maybeSingle();
+    if (productRow?.images && Array.isArray(productRow.images) && productRow.images.length > 0) {
+      productImageUrl = productRow.images[0];
+    }
+
     await supabase.from("notifications").insert({
       user_id: pendingOrder.seller_id,
       title: "New Order! 🎉",
@@ -249,6 +260,7 @@ serve(async (req) => {
       type: "order",
       is_read: false,
       related_order_id: newOrder?.id || null,
+      image_url: productImageUrl,
     });
 
     // Duplicate webhook se bachne ke liye pehle hi "completed" mark karo
