@@ -30,6 +30,9 @@ const Search = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  // Sirf un sellers ke user_id jinhe admin ne verify kiya hai — "Verified" badge
+  // sirf inhi ke products pe dikhega, baaki sab pe nahi.
+  const [verifiedSellerIds, setVerifiedSellerIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -140,6 +143,20 @@ const Search = () => {
     const { data } = await q;
     setProducts(data || []);
     setLoading(false);
+
+    // Products ke sellers ka verification status fetch karo — "Verified" badge
+    // sirf actually-verified sellers ke products pe hi dikhna chahiye.
+    const sellerIds = Array.from(new Set((data || []).map((p: any) => p.user_id).filter(Boolean)));
+    if (sellerIds.length > 0) {
+      const { data: verifiedProfiles } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .in("user_id", sellerIds)
+        .eq("is_verified", true);
+      setVerifiedSellerIds(new Set((verifiedProfiles || []).map((p: any) => p.user_id)));
+    } else {
+      setVerifiedSellerIds(new Set());
+    }
   };
 
   const handleNearMe = () => {
@@ -316,9 +333,11 @@ const Search = () => {
                     <Heart className={`w-3.5 h-3.5 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
                   </button>
                   <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
-                  <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    <ShieldCheck className="w-2.5 h-2.5" /> Verified
-                  </span>
+                  {verifiedSellerIds.has((item as any).user_id) && (
+                    <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                    </span>
+                  )}
                 </div>
                 <div className="p-2.5 md:p-3">
                   <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.title}</p>
