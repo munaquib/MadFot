@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,17 +58,31 @@ interface Order {
   created_at: string;
 }
 
+interface Product {
+  id: string;
+  title: string;
+  images: string[] | null;
+  price: number;
+  category: string | null;
+  status: string | null;
+  views_count: number | null;
+  user_id: string;
+  seller_name?: string;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     let channel: any;
@@ -82,8 +96,9 @@ const AdminDashboard = () => {
         await fetchSellers();
         await fetchReports();
         await fetchOrders();
+        await fetchProducts();
 
-        // Real-time: ads, profiles, reports, orders table changes pe auto refresh
+        // Real-time: ads, profiles, reports, orders, products table changes pe auto refresh
         channel = supabase
           .channel("admin-realtime")
           .on("postgres_changes", { event: "*", schema: "public", table: "ads" }, () => {
@@ -100,6 +115,9 @@ const AdminDashboard = () => {
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
             fetchOrders();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+            fetchProducts();
           })
           .subscribe();
 
@@ -160,6 +178,31 @@ const AdminDashboard = () => {
     setOrders(enriched as Order[]);
   };
 
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from("products")
+      .select("id, title, images, price, category, status, views_count, user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (!data) { setProducts([]); return; }
+    const sellerIds = [...new Set(data.map((p: any) => p.user_id).filter(Boolean))];
+    let sellerMap: Record<string, string> = {};
+    if (sellerIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", sellerIds);
+      profiles?.forEach((p: any) => { sellerMap[p.user_id] = p.full_name; });
+    }
+    const enriched = data.map((p: any) => ({ ...p, seller_name: sellerMap[p.user_id] || "Unknown" }));
+    setProducts(enriched as Product[]);
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!window.confirm("Delete this listing?")) return;
+    const { error } = await supabase.from("products").delete().eq("id", productId);
+    if (error) { toast.error("Failed to delete (order history may be linked)"); return; }
+    toast.success("Listing deleted");
+    fetchProducts();
+  };
+
   const handleApprove = async (adId: string) => {
     const now = new Date();
     const ad = ads.find((a) => a.id === adId);
@@ -198,7 +241,7 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" ? ads : ads.filter((a) => a.status === tab);
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
@@ -241,7 +284,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-          {(["pending", "active", "expired", "all", "orders", "sellers", "reports"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "sellers", "reports"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -250,6 +293,7 @@ const AdminDashboard = () => {
               {t === "sellers" && <Users className="w-3 h-3" />}
               {t === "reports" && <Flag className="w-3 h-3" />}
               {t === "orders" && <Package className="w-3 h-3" />}
+              {t === "products" && <ShoppingBag className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -257,6 +301,8 @@ const AdminDashboard = () => {
                 ? `(${reports.length})`
                 : t === "orders"
                 ? `(${orders.length})`
+                : t === "products"
+                ? `(${products.length})`
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
           ))}
@@ -321,6 +367,38 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Products Tab */}
+        {tab === "products" && (
+          <div className="space-y-3">
+            {products.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No listings yet</p>
+            ) : (
+              products.map((p, i) => (
+                <motion.div key={p.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                >
+                  <div className="flex gap-3">
+                    {p.images && p.images[0] && <img src={p.images[0]} alt={p.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{p.title}</p>
+                      <p className="text-[10px] text-muted-foreground">Seller: <span className="text-foreground font-medium">{p.seller_name}</span></p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {p.category && <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{p.category}</span>}
+                        {p.status && <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{p.status}</span>}
+                        <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{p.views_count || 0} views</span>
+                      </div>
+                      <p className="text-xs font-bold text-secondary mt-1">₹{p.price}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteProduct(p.id)} className="mt-2 w-full py-1.5 text-destructive text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-destructive/5 rounded-lg transition-all">
+                    <Trash2 className="w-3 h-3" /> Remove Listing
+                  </button>
+                </motion.div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* Sellers Tab */}
         {tab === "sellers" && (
           <div className="space-y-3">
@@ -381,7 +459,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
