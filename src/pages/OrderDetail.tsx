@@ -1,4 +1,4 @@
-import { ArrowLeft, Package, Truck, CheckCircle, Clock, Phone, MapPin, User, Copy } from "lucide-react";
+import { ArrowLeft, Package, Truck, CheckCircle, Clock, Phone, MapPin, User, Copy, MapPinned, RefreshCw } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -37,6 +37,13 @@ const getStatusLabel = (status: string) => {
   return status;
 };
 
+type TrackActivity = {
+  date: string | null;
+  status: string;
+  location: string;
+  activity: string;
+};
+
 const OrderDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -45,6 +52,12 @@ const OrderDetail = () => {
   const [productImage, setProductImage] = useState<string>("/placeholder.svg");
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  // Live tracking (naya, alag state — existing kisi cheez ko touch nahi karta)
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackError, setTrackError] = useState(false);
+  const [trackActivities, setTrackActivities] = useState<TrackActivity[]>([]);
+  const [trackCourier, setTrackCourier] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -64,6 +77,35 @@ const OrderDetail = () => {
     };
     fetchOrder();
   }, [id]);
+
+  // Order load hone ke baad, agar AWB assign ho chuka hai, tabhi live tracking fetch karo
+  useEffect(() => {
+    if (!order?.id || !order?.awb_code) return;
+    fetchTracking();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.awb_code]);
+
+  const fetchTracking = async () => {
+    if (!order?.id) return;
+    setTrackLoading(true);
+    setTrackError(false);
+    try {
+      const { data, error } = await supabase.functions.invoke("shiprocket-track", {
+        body: { order_id: order.id },
+      });
+      if (error || !data) {
+        setTrackError(true);
+      } else {
+        setTrackActivities(Array.isArray(data.activities) ? data.activities : []);
+        setTrackCourier(data.courier_name || null);
+      }
+    } catch (e) {
+      console.error("Tracking fetch failed:", e);
+      setTrackError(true);
+    } finally {
+      setTrackLoading(false);
+    }
+  };
 
   const copyAddress = () => {
     const full = `${order.buyer_name || ""}\n${order.delivery_address || ""}\n${order.delivery_city || ""} - ${order.delivery_pincode || ""}\nPhone: ${order.buyer_phone || ""}`;
@@ -91,6 +133,7 @@ const OrderDetail = () => {
   const isBuyer = !!(user && order.buyer_id === user.id);
   const { color, icon: Icon } = getStatusStyle(order.status);
   const currentStepIndex = statusFlow.indexOf((order.status || "processing").toLowerCase());
+  const canShowTracking = (isBuyer || isSeller) && !!order.awb_code;
 
   return (
     <AppLayout>
@@ -176,6 +219,70 @@ const OrderDetail = () => {
             })}
           </div>
         </motion.div>
+
+        {/* Live courier tracking — sirf tab dikhega jab AWB assign ho chuka ho */}
+        {canShowTracking && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+            className="glass-card rounded-2xl p-4 border border-border/30 shadow-card mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <MapPinned className="w-4 h-4 text-secondary" />
+                <h3 className="text-sm font-bold text-foreground font-serif">Track Package</h3>
+              </div>
+              <button
+                onClick={fetchTracking}
+                disabled={trackLoading}
+                className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-all disabled:opacity-50"
+                title="Refresh tracking"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${trackLoading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+
+            {trackCourier && (
+              <p className="text-xs text-muted-foreground mb-3">
+                Courier: <span className="font-semibold text-foreground">{trackCourier}</span>
+                {order.awb_code && <span className="ml-1">• AWB: {order.awb_code}</span>}
+              </p>
+            )}
+
+            {trackLoading && trackActivities.length === 0 ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">Fetching latest updates…</div>
+            ) : trackError && trackActivities.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-xs text-muted-foreground">Tracking abhi available nahi hai. Thodi der baad try karo.</p>
+              </div>
+            ) : trackActivities.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-xs text-muted-foreground">Courier ne abhi tak koi update nahi bheja hai. Pickup hote hi yahan dikhega.</p>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {trackActivities.map((act, idx) => {
+                  const isLatest = idx === 0;
+                  const isLast = idx === trackActivities.length - 1;
+                  return (
+                    <div key={idx} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${isLatest ? "bg-secondary ring-4 ring-secondary/15" : "bg-border"}`} />
+                        {!isLast && <div className="w-0.5 flex-1 bg-border/70 my-0.5" style={{ minHeight: "28px" }} />}
+                      </div>
+                      <div className={`pb-4 flex-1 min-w-0 ${isLatest ? "" : "opacity-70"}`}>
+                        <p className={`text-xs font-semibold ${isLatest ? "text-foreground" : "text-muted-foreground"}`}>{act.activity || act.status}</p>
+                        {act.location && <p className="text-[10px] text-muted-foreground mt-0.5">{act.location}</p>}
+                        {act.date && (
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                            {new Date(act.date).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {/* Seller actions — Mark as Shipped/Delivered (order ko age badhane ke liye) */}
         {isSeller && (order.status === "processing" || order.status === "shipped") && (
