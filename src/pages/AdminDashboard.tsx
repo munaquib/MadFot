@@ -49,6 +49,8 @@ interface Order {
   seller_name?: string;
   amount: number;
   shipping_charge: number | null;
+  platform_commission: number | null;
+  seller_payout_amount: number | null;
   status: string;
   payout_status: string | null;
   awb_code: string | null;
@@ -164,7 +166,7 @@ const AdminDashboard = () => {
   const fetchOrders = async () => {
     const { data } = await supabase
       .from("orders")
-      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, status, payout_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
+      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, platform_commission, seller_payout_amount, status, payout_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (!data) { setOrders([]); return; }
@@ -245,6 +247,14 @@ const AdminDashboard = () => {
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
+  const validOrders = orders.filter((o) => o.status !== "cancelled");
+  const gmvStats = {
+    totalSales: validOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0),
+    totalShipping: validOrders.reduce((sum, o) => sum + (Number(o.shipping_charge) || 0), 0),
+    totalCommission: validOrders.reduce((sum, o) => sum + (Number(o.platform_commission) || 0), 0),
+    totalPayout: validOrders.reduce((sum, o) => sum + (Number(o.seller_payout_amount) || 0), 0),
+  };
+
   if (loading) return <AppLayout><div className="min-h-screen flex items-center justify-center"><div className="text-secondary font-semibold">Loading...</div></div></AppLayout>;
 
   if (!isAdmin) return (
@@ -311,6 +321,23 @@ const AdminDashboard = () => {
         {/* Orders Tab */}
         {tab === "orders" && (
           <div className="space-y-4">
+            <div>
+              <p className="text-xs font-bold text-foreground mb-2">Business Overview</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                {[
+                  { label: "Total Sales (GMV)", value: `₹${gmvStats.totalSales.toLocaleString()}` },
+                  { label: "Shipping Collected", value: `₹${gmvStats.totalShipping.toLocaleString()}` },
+                  { label: "Platform Commission", value: `₹${gmvStats.totalCommission.toLocaleString()}` },
+                  { label: "Seller Payouts", value: `₹${gmvStats.totalPayout.toLocaleString()}` },
+                ].map((s) => (
+                  <div key={s.label} className="glass-card rounded-xl p-3 text-center border border-border/30">
+                    <p className="text-base font-bold text-foreground">{s.value}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {needsAttentionOrders.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
