@@ -13,11 +13,11 @@ const PaymentInfo = () => {
       </div>
       <div className="px-4 py-6 max-w-2xl mx-auto space-y-4">
 
-        {/* Powered by Razorpay */}
+        {/* Powered by Cashfree */}
         <div className="glass-card rounded-2xl p-4 border border-border/30 shadow-card">
-          <h3 className="font-bold text-foreground text-sm font-serif mb-2">Powered by Razorpay</h3>
+          <h3 className="font-bold text-foreground text-sm font-serif mb-2">Powered by Cashfree</h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            All payments on MadFod are securely processed by <span className="font-semibold text-foreground">Razorpay</span> — India's most trusted payment gateway. Your card and bank details are never stored on our servers.
+            All payments on MadFod are securely processed by <span className="font-semibold text-foreground">Cashfree Payments</span> — a trusted payment gateway in India. Your card and bank details are never stored on our servers.
           </p>
         </div>
 
