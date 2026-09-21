@@ -13,11 +13,11 @@ const sections = [
   },
   {
     title: "Information Sharing",
-    content: "We share your information only with other users as necessary for transactions (e.g., sharing your name with a buyer/seller), and with service providers like Razorpay for payment processing. We never sell your data."
+    content: "We share your information only with other users as necessary for transactions (e.g., sharing your name with a buyer/seller), with service providers like Cashfree for payment processing, and with courier and logistics partners who pick up and deliver your orders (they receive the name, phone number, and address needed for pickup and delivery). We never sell your data."
   },
   {
     title: "Data Security",
-    content: "We use industry-standard security measures to protect your data, including encrypted connections (HTTPS) and secure storage. Payments are processed by Razorpay, a PCI-DSS compliant payment gateway."
+    content: "We use industry-standard security measures to protect your data, including encrypted connections (HTTPS) and secure storage. Payments are processed by Cashfree, a PCI-DSS compliant payment gateway."
   },
   {
     title: "Cookies",
@@ -47,7 +47,7 @@ const PrivacyPolicy = () => {
         <h1 className="text-secondary font-bold text-lg font-serif">Privacy Policy</h1>
       </div>
       <div className="px-4 py-6 max-w-2xl mx-auto space-y-4">
-        <p className="text-xs text-muted-foreground">Last updated: January 2026</p>
+        <p className="text-xs text-muted-foreground">Last updated: September 2026</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           At MadFod, we take your privacy seriously. This policy explains how we collect, use, and protect your personal information.
         </p>
