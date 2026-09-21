@@ -11,8 +11,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 
-// Flat shipping charge jo buyer deta hai (MadFod courier se pickup + delivery karata hai)
 const SHIPPING_CHARGE = 100;
+
+// iPhone/iPad camera se aayi photos HEIC/HEIF format mein hoti hain, jise browsers
+// (Chrome, Firefox, Android) directly nahi dikha sakte. Isliye upload se pehle
+// aise files ko JPEG mein convert karte hain. Library sirf tabhi load hoti hai
+// jab zaroorat ho (dynamic import), taaki baaki uploads slow na ho.
+const isHeicFile = (file: File) => {
+  const name = file.name.toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  return name.endsWith(".heic") || name.endsWith(".heif") || type === "image/heic" || type === "image/heif";
+};
+
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+  try {
+    const heic2any = (await import("heic2any")).default;
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const blob = Array.isArray(converted) ? converted[0] : converted;
+    return new File([blob as Blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch (err) {
+    console.error("HEIC conversion failed:", err);
+    // Conversion fail ho jaye toh bhi original file return karo, taaki upload
+    // poori tarah na atak jaye — baaki images post ho jayengi
+    return file;
+  }
+};
 
 // Upload se pehle image ko resize + compress karta hai:
 // - Max 1200x1200 (width AND height, jo bhi bada ho use limit karta hai)
@@ -75,6 +101,13 @@ const compressImage = (file: File): Promise<File> => {
     reader.readAsDataURL(file);
   });
 };
+
+// HEIC ho toh pehle JPEG mein convert karo, phir normal resize/compress chalao
+const prepareImageForUpload = async (file: File): Promise<File> => {
+  const jpegFile = isHeicFile(file) ? await convertHeicToJpeg(file) : file;
+  return compressImage(jpegFile);
+};
+
 const sizes = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
 const conditions = ["New with Tags", "Like New", "Good", "Fair"];
 
@@ -254,7 +287,7 @@ const Sell = () => {
     try {
       const uploadedUrls: string[] = [];
       for (const file of images) {
-        const compressed = await compressImage(file);
+        const compressed = await prepareImageForUpload(file);
         const path = `${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from("product-images")
