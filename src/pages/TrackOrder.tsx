@@ -100,7 +100,7 @@ const TrackOrder = () => {
               Track
             </button>
           </form>
-          <p className="text-[10px] text-muted-foreground mt-2">AWB number tumhare order ki delivery details mein milega, jaise hi order ship hota hai.</p>
+          <p className="text-[10px] text-muted-foreground mt-2">You'll Find The AWB Number In Your Order's Delivery Details Once It Ships.</p>
         </motion.div>
 
         {/* Result / error / empty states */}
