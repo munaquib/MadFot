@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,16 +40,35 @@ interface Report {
   reported_name?: string;
 }
 
+interface Order {
+  id: string;
+  order_number: string;
+  product_title: string;
+  buyer_name: string;
+  seller_id: string;
+  seller_name?: string;
+  amount: number;
+  shipping_charge: number | null;
+  status: string;
+  payout_status: string | null;
+  awb_code: string | null;
+  courier_name: string | null;
+  shiprocket_status: string | null;
+  shiprocket_error: string | null;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     let channel: any;
@@ -62,8 +81,9 @@ const AdminDashboard = () => {
         await fetchStats();
         await fetchSellers();
         await fetchReports();
+        await fetchOrders();
 
-        // Real-time: ads, profiles, reports table changes pe auto refresh
+        // Real-time: ads, profiles, reports, orders table changes pe auto refresh
         channel = supabase
           .channel("admin-realtime")
           .on("postgres_changes", { event: "*", schema: "public", table: "ads" }, () => {
@@ -77,6 +97,9 @@ const AdminDashboard = () => {
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "ad_analytics" }, () => {
             fetchStats();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+            fetchOrders();
           })
           .subscribe();
 
@@ -120,6 +143,23 @@ const AdminDashboard = () => {
     setReports(enriched);
   };
 
+  const fetchOrders = async () => {
+    const { data } = await supabase
+      .from("orders")
+      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, status, payout_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (!data) { setOrders([]); return; }
+    const sellerIds = [...new Set(data.map((o: any) => o.seller_id).filter(Boolean))];
+    let sellerMap: Record<string, string> = {};
+    if (sellerIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", sellerIds);
+      profiles?.forEach((p: any) => { sellerMap[p.user_id] = p.full_name; });
+    }
+    const enriched = data.map((o: any) => ({ ...o, seller_name: sellerMap[o.seller_id] || "Unknown" }));
+    setOrders(enriched as Order[]);
+  };
+
   const handleApprove = async (adId: string) => {
     const now = new Date();
     const ad = ads.find((a) => a.id === adId);
@@ -158,7 +198,9 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" ? ads : ads.filter((a) => a.status === tab);
+
+  const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
   if (loading) return <AppLayout><div className="min-h-screen flex items-center justify-center"><div className="text-secondary font-semibold">Loading...</div></div></AppLayout>;
 
@@ -199,7 +241,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-          {(["pending", "active", "expired", "all", "sellers", "reports"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "sellers", "reports"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -207,10 +249,77 @@ const AdminDashboard = () => {
             >
               {t === "sellers" && <Users className="w-3 h-3" />}
               {t === "reports" && <Flag className="w-3 h-3" />}
-              {t} {t === "sellers" ? `(${sellers.length})` : t === "reports" ? `(${reports.length})` : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
+              {t === "orders" && <Package className="w-3 h-3" />}
+              {t}{" "}
+              {t === "sellers"
+                ? `(${sellers.length})`
+                : t === "reports"
+                ? `(${reports.length})`
+                : t === "orders"
+                ? `(${orders.length})`
+                : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
           ))}
         </div>
+
+        {/* Orders Tab */}
+        {tab === "orders" && (
+          <div className="space-y-4">
+            {needsAttentionOrders.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <p className="text-xs font-bold text-destructive">Needs Attention ({needsAttentionOrders.length})</p>
+                </div>
+                <div className="space-y-2 mb-4">
+                  {needsAttentionOrders.map((o) => (
+                    <div key={o.id} className="glass-card rounded-xl p-3 border border-destructive/30 bg-destructive/5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-foreground">{o.order_number}</p>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">{o.shiprocket_status || "error"}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{o.product_title}</p>
+                      {o.shiprocket_error && <p className="text-[10px] text-destructive mt-1">{o.shiprocket_error}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {orders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No orders yet</p>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((o, i) => (
+                  <motion.div key={o.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                    className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-foreground">{o.order_number}</p>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        o.status === "delivered" ? "bg-primary/10 text-primary" :
+                        o.status === "shipped" ? "bg-blue-100 text-blue-700" :
+                        o.status === "cancelled" ? "bg-destructive/10 text-destructive" :
+                        "bg-secondary/10 text-secondary"
+                      }`}>{o.status}</span>
+                    </div>
+                    <p className="text-[11px] text-foreground truncate">{o.product_title}</p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1.5">
+                      <p className="text-[10px] text-muted-foreground">Buyer: <span className="text-foreground font-medium">{o.buyer_name || "—"}</span></p>
+                      <p className="text-[10px] text-muted-foreground">Seller: <span className="text-foreground font-medium">{o.seller_name}</span></p>
+                      <p className="text-[10px] text-muted-foreground">Amount: <span className="text-foreground font-medium">₹{o.amount}</span>{o.shipping_charge ? ` + ₹${o.shipping_charge}` : ""}</p>
+                      <p className="text-[10px] text-muted-foreground">Payout: <span className="text-foreground font-medium">{o.payout_status || "—"}</span></p>
+                    </div>
+                    {(o.awb_code || o.courier_name) && (
+                      <p className="text-[10px] text-muted-foreground mt-1">{o.courier_name || "Courier"} — AWB: {o.awb_code || "—"}</p>
+                    )}
+                    <p className="text-[9px] text-muted-foreground mt-1">{new Date(o.created_at).toLocaleDateString()}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sellers Tab */}
         {tab === "sellers" && (
@@ -272,7 +381,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
