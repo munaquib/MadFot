@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck, RotateCcw } from "lucide-react";
+import { Settings, Shield, LogOut, ChevronRight, Package, Heart, Star, HelpCircle, Trash2, Megaphone, BadgeCheck, ShieldCheck, RotateCcw, MapPinned } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 const baseMenuItems = [
   { icon: Package, label: "My Orders", path: "/my-orders" },
+  { icon: MapPinned, label: "Track Order", path: "/track-order" },
   { icon: Heart, label: "Saved Items", path: "/wishlist" },
   { icon: Megaphone, label: "My Ads", path: "/my-ads" },
   { icon: Star, label: "My Reviews", path: "/my-reviews" },

@@ -34,9 +34,9 @@ serve(async (req) => {
     }
     const userId = userData.user.id;
 
-    const { order_id } = await req.json();
-    if (!order_id) {
-      return new Response(JSON.stringify({ error: "order_id is required" }), {
+    const { order_id, awb_code } = await req.json();
+    if (!order_id && !awb_code) {
+      return new Response(JSON.stringify({ error: "order_id ya awb_code chahiye" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -44,11 +44,13 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: order, error: orderErr } = await supabase
+    let query = supabase
       .from("orders")
-      .select("id, buyer_id, seller_id, awb_code, courier_name, shiprocket_status")
-      .eq("id", order_id)
-      .maybeSingle();
+      .select("id, buyer_id, seller_id, awb_code, courier_name, shiprocket_status, product_title");
+
+    query = order_id ? query.eq("id", order_id) : query.eq("awb_code", (awb_code as string).trim());
+
+    const { data: order, error: orderErr } = await query.maybeSingle();
 
     if (orderErr || !order) {
       return new Response(JSON.stringify({ error: "Order not found" }), {
@@ -57,7 +59,7 @@ serve(async (req) => {
       });
     }
 
-    // Sirf isi order ka buyer ya seller hi tracking dekh sake
+    // Sirf isi order ka buyer ya seller hi tracking dekh sake — chahe search order_id se ho ya AWB se
     if (order.buyer_id !== userId && order.seller_id !== userId) {
       return new Response(JSON.stringify({ error: "Not allowed" }), {
         status: 403,
@@ -112,6 +114,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        order_id: order.id,
+        product_title: order.product_title,
         status: trackingData?.shipment_status || order.shiprocket_status || "in_transit",
         courier_name: order.courier_name,
         awb_code: order.awb_code,
