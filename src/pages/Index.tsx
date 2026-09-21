@@ -42,6 +42,9 @@ const Index = () => {
   const [avgRating, setAvgRating] = useState("—");
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  // Sirf un sellers ke user_id jinhe admin ne verify kiya hai — "Verified" badge
+  // sirf inhi ke products pe dikhega, baaki sab pe nahi.
+  const [verifiedSellerIds, setVerifiedSellerIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -94,6 +97,22 @@ const Index = () => {
       .order("created_at", { ascending: false })
       .limit(4);
     setRecentlyAdded(recent || []);
+
+    // In dono lists ke sellers ka verification status ek saath fetch karo,
+    // taaki "Verified" badge sirf actually-verified sellers ke products pe dikhe.
+    const allSellerIds = Array.from(
+      new Set([...(featured || []), ...(recent || [])].map((p: any) => p.user_id).filter(Boolean))
+    );
+    if (allSellerIds.length > 0) {
+      const { data: verifiedProfiles } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .in("user_id", allSellerIds)
+        .eq("is_verified", true);
+      setVerifiedSellerIds(new Set((verifiedProfiles || []).map((p: any) => p.user_id)));
+    } else {
+      setVerifiedSellerIds(new Set());
+    }
 
     const { count } = await supabase
       .from("products")
@@ -275,9 +294,11 @@ const Index = () => {
                     <Heart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
                   </button>
                   <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
-                  <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    <ShieldCheck className="w-2.5 h-2.5" /> Verified
-                  </span>
+                  {verifiedSellerIds.has((item as any).user_id) && (
+                    <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                    </span>
+                  )}
                 </div>
                 <div className="p-2.5 md:p-3">
                   <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.title}</p>
@@ -323,6 +344,11 @@ const Index = () => {
                     <Heart className={`w-3.5 h-3.5 md:w-4 md:h-4 ${wishlistIds.has(item.id) ? "fill-white" : ""}`} />
                   </button>
                   <span className="absolute bottom-2 left-2 bg-primary/90 text-secondary text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{item.condition}</span>
+                  {verifiedSellerIds.has((item as any).user_id) && (
+                    <span className="absolute top-2 left-2 bg-secondary/90 text-secondary-foreground text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                    </span>
+                  )}
                 </div>
                 <div className="p-2.5 md:p-3">
                   <p className="text-xs md:text-sm font-semibold text-foreground truncate">{item.title}</p>
