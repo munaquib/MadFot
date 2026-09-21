@@ -256,7 +256,7 @@ serve(async (req) => {
     await supabase.from("notifications").insert({
       user_id: pendingOrder.seller_id,
       title: "New Order! 🎉",
-      message: `${pendingOrder.product_title} ka order aaya hai. Parcel pack karke ready rakho, courier pickup ke liye aayega.`,
+      message: `You've received an order for ${pendingOrder.product_title}. Pack the parcel and keep it ready — the courier will arrive soon for pickup.`,
       type: "order",
       is_read: false,
       related_order_id: newOrder?.id || null,
