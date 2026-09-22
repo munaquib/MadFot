@@ -53,6 +53,7 @@ interface Order {
   seller_payout_amount: number | null;
   status: string;
   payout_status: string | null;
+  refund_status: string | null;
   awb_code: string | null;
   courier_name: string | null;
   shiprocket_status: string | null;
@@ -79,7 +80,7 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -168,7 +169,7 @@ const AdminDashboard = () => {
   const fetchOrders = async () => {
     const { data } = await supabase
       .from("orders")
-      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, platform_commission, seller_payout_amount, status, payout_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
+      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, platform_commission, seller_payout_amount, status, payout_status, refund_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (!data) { setOrders([]); return; }
@@ -234,6 +235,33 @@ const AdminDashboard = () => {
     setReconciling(false);
   };
 
+  const [processingRefund, setProcessingRefund] = useState<string | null>(null);
+
+  const handleProcessRefund = async (orderId: string, includeShipping: boolean) => {
+    if (!window.confirm("Process refund via Cashfree for this order?")) return;
+    setProcessingRefund(orderId);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`https://ieauimziqompyevwrxwo.supabase.co/functions/v1/process-refund`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, include_shipping: includeShipping }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error || "Refund failed");
+        setProcessingRefund(null);
+        return;
+      }
+      toast.success(`Refund of ₹${data.refund_amount} processed ✅`);
+      fetchOrders();
+    } catch (e) {
+      toast.error("Failed to reach refund service");
+    }
+    setProcessingRefund(null);
+  };
+
   const handleApprove = async (adId: string) => {
     const now = new Date();
     const ad = ads.find((a) => a.id === adId);
@@ -272,9 +300,11 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" ? ads : ads.filter((a) => a.status === tab);
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
+
+  const returnOrders = orders.filter((o) => (o.status === "returned" || o.status === "cancelled") && o.refund_status !== "processed");
 
   const validOrders = orders.filter((o) => o.status !== "cancelled");
   const gmvStats = {
@@ -323,7 +353,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-          {(["pending", "active", "expired", "all", "orders", "products", "sellers", "reports"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "sellers", "reports"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -342,6 +372,8 @@ const AdminDashboard = () => {
                 ? `(${orders.length})`
                 : t === "products"
                 ? `(${products.length})`
+                : t === "returns"
+                ? `(${returnOrders.length})`
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
           ))}
@@ -486,6 +518,51 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Returns Tab */}
+        {tab === "returns" && (
+          <div className="space-y-3">
+            {returnOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No pending returns/refunds</p>
+            ) : (
+              returnOrders.map((o, i) => (
+                <motion.div key={o.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-foreground">{o.order_number}</p>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-secondary/10 text-secondary">{o.status}</span>
+                  </div>
+                  <p className="text-[11px] text-foreground truncate">{o.product_title}</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1.5">
+                    <p className="text-[10px] text-muted-foreground">Buyer: <span className="text-foreground font-medium">{o.buyer_name || "—"}</span></p>
+                    <p className="text-[10px] text-muted-foreground">Seller: <span className="text-foreground font-medium">{o.seller_name}</span></p>
+                    <p className="text-[10px] text-muted-foreground">Amount: <span className="text-foreground font-medium">₹{o.amount}</span></p>
+                    <p className="text-[10px] text-muted-foreground">Refund: <span className="text-foreground font-medium">{o.refund_status || "not started"}</span></p>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => handleProcessRefund(o.id, false)}
+                      disabled={processingRefund === o.id}
+                      className="flex-1 py-1.5 bg-primary text-secondary rounded-xl text-[10px] font-bold disabled:opacity-50"
+                    >
+                      {processingRefund === o.id ? "Processing..." : `Refund ₹${o.amount}`}
+                    </button>
+                    {o.shipping_charge ? (
+                      <button
+                        onClick={() => handleProcessRefund(o.id, true)}
+                        disabled={processingRefund === o.id}
+                        className="flex-1 py-1.5 bg-muted text-foreground rounded-xl text-[10px] font-bold disabled:opacity-50"
+                      >
+                        Refund ₹{Number(o.amount) + Number(o.shipping_charge)} (+shipping)
+                      </button>
+                    ) : null}
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* Sellers Tab */}
         {tab === "sellers" && (
           <div className="space-y-3">
@@ -546,7 +623,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
