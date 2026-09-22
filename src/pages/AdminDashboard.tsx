@@ -85,6 +85,8 @@ const AdminDashboard = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileResult, setReconcileResult] = useState<{ checked: number; mismatches: number; results: any[] } | null>(null);
 
   useEffect(() => {
     let channel: any;
@@ -205,6 +207,33 @@ const AdminDashboard = () => {
     fetchProducts();
   };
 
+  const handleCheckPayments = async () => {
+    setReconciling(true);
+    setReconcileResult(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`https://ieauimziqompyevwrxwo.supabase.co/functions/v1/payment-reconcile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error || "Failed to check payments");
+        setReconciling(false);
+        return;
+      }
+      setReconcileResult(data);
+      if (data.mismatches > 0) {
+        toast.error(`${data.mismatches} payment mismatch(es) found`);
+      } else {
+        toast.success("All checked payments match ✅");
+      }
+    } catch (e) {
+      toast.error("Failed to reach payment check");
+    }
+    setReconciling(false);
+  };
+
   const handleApprove = async (adId: string) => {
     const now = new Date();
     const ad = ads.find((a) => a.id === adId);
@@ -322,7 +351,16 @@ const AdminDashboard = () => {
         {tab === "orders" && (
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-bold text-foreground mb-2">Business Overview</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-foreground">Business Overview</p>
+                <button
+                  onClick={handleCheckPayments}
+                  disabled={reconciling}
+                  className="px-3 py-1.5 bg-primary text-secondary rounded-xl text-[10px] font-bold disabled:opacity-50"
+                >
+                  {reconciling ? "Checking..." : "Check Payments"}
+                </button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                 {[
                   { label: "Total Sales (GMV)", value: `₹${gmvStats.totalSales.toLocaleString()}` },
@@ -337,6 +375,28 @@ const AdminDashboard = () => {
                 ))}
               </div>
             </div>
+
+            {reconcileResult && (
+              <div>
+                <p className="text-xs font-bold text-foreground mb-2">
+                  Payment Check Results ({reconcileResult.checked} checked, {reconcileResult.mismatches} mismatch{reconcileResult.mismatches !== 1 ? "es" : ""})
+                </p>
+                <div className="space-y-2 mb-4">
+                  {reconcileResult.results.filter((r: any) => r.mismatch).map((r: any) => (
+                    <div key={r.order_number} className="glass-card rounded-xl p-3 border border-destructive/30 bg-destructive/5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-foreground">{r.order_number}</p>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">Cashfree: {r.cashfree_status}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Local status: {r.local_status} — but Cashfree shows payment done. Check this order.</p>
+                    </div>
+                  ))}
+                  {reconcileResult.mismatches === 0 && (
+                    <p className="text-[11px] text-muted-foreground">No mismatches found in the last {reconcileResult.checked} pending/processing orders.</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {needsAttentionOrders.length > 0 && (
               <div>
