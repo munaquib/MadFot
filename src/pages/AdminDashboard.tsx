@@ -352,7 +352,7 @@ const AdminDashboard = () => {
 
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
           {(["pending", "active", "expired", "all", "orders", "products", "returns", "sellers", "reports"] as const).map((t) => (
             <button
               key={t}
