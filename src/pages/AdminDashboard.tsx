@@ -26,6 +26,7 @@ interface Seller {
   user_id: string;
   full_name: string;
   is_verified: boolean;
+  is_banned: boolean;
   created_at: string;
 }
 
@@ -151,7 +152,7 @@ const AdminDashboard = () => {
   };
 
   const fetchSellers = async () => {
-    const { data } = await supabase.from("profiles").select("user_id, full_name, is_verified, created_at").order("created_at", { ascending: false });
+    const { data } = await supabase.from("profiles").select("user_id, full_name, is_verified, is_banned, created_at").order("created_at", { ascending: false });
     setSellers((data as Seller[]) || []);
   };
 
@@ -294,17 +295,34 @@ const AdminDashboard = () => {
     fetchSellers();
   };
 
+  const handleBanUser = async (userId: string, currentStatus: boolean) => {
+    if (!window.confirm(currentStatus ? "Unban this user?" : "Ban this user?")) return;
+    const { error } = await supabase.from("profiles").update({ is_banned: !currentStatus }).eq("user_id", userId);
+    if (error) { toast.error("Failed to update"); return; }
+    toast.success(!currentStatus ? "User banned 🚫" : "User unbanned");
+    fetchSellers();
+  };
+
   const handleDeleteReport = async (reportId: string) => {
     await supabase.from("reports").delete().eq("id", reportId);
     toast.success("Report dismissed");
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" ? ads : ads.filter((a) => a.status === tab);
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
   const returnOrders = orders.filter((o) => (o.status === "returned" || o.status === "cancelled") && o.refund_status !== "processed");
+
+  const buyerMap: Record<string, { name: string; orderCount: number; totalSpent: number }> = {};
+  orders.forEach((o) => {
+    const key = o.buyer_name || "Unknown Buyer";
+    if (!buyerMap[key]) buyerMap[key] = { name: key, orderCount: 0, totalSpent: 0 };
+    buyerMap[key].orderCount += 1;
+    buyerMap[key].totalSpent += Number(o.amount) || 0;
+  });
+  const buyersList = Object.values(buyerMap).sort((a, b) => b.orderCount - a.orderCount);
 
   const validOrders = orders.filter((o) => o.status !== "cancelled");
   const gmvStats = {
@@ -353,7 +371,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
-          {(["pending", "active", "expired", "all", "orders", "products", "returns", "sellers", "reports"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -363,6 +381,7 @@ const AdminDashboard = () => {
               {t === "reports" && <Flag className="w-3 h-3" />}
               {t === "orders" && <Package className="w-3 h-3" />}
               {t === "products" && <ShoppingBag className="w-3 h-3" />}
+              {t === "buyers" && <Users className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -374,6 +393,8 @@ const AdminDashboard = () => {
                 ? `(${products.length})`
                 : t === "returns"
                 ? `(${returnOrders.length})`
+                : t === "buyers"
+                ? `(${buyersList.length})`
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
           ))}
@@ -563,6 +584,33 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Buyers Tab */}
+        {tab === "buyers" && (
+          <div className="space-y-3">
+            {buyersList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No buyers yet</p>
+            ) : (
+              buyersList.map((b, i) => (
+                <motion.div key={b.name + i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-secondary font-bold text-sm">
+                      {b.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{b.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{b.orderCount} order{b.orderCount !== 1 ? "s" : ""}{b.orderCount > 1 ? " — repeat buyer" : ""}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-secondary">₹{b.totalSpent.toLocaleString()}</p>
+                </motion.div>
+              ))
+            )}
+            <p className="text-[10px] text-muted-foreground text-center pt-2">Based on the last {orders.length} orders loaded in the Orders tab.</p>
+          </div>
+        )}
+
         {/* Sellers Tab */}
         {tab === "sellers" && (
           <div className="space-y-3">
@@ -576,17 +624,28 @@ const AdminDashboard = () => {
                     {seller.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground">{seller.full_name || "Unknown"}</p>
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      {seller.full_name || "Unknown"}
+                      {seller.is_banned && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">Banned</span>}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">{new Date(seller.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleVerifySeller(seller.user_id, seller.is_verified)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${seller.is_verified ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
-                >
-                  <BadgeCheck className="w-3.5 h-3.5" />
-                  {seller.is_verified ? "Verified ✅" : "Verify"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleVerifySeller(seller.user_id, seller.is_verified)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${seller.is_verified ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
+                  >
+                    <BadgeCheck className="w-3.5 h-3.5" />
+                    {seller.is_verified ? "Verified ✅" : "Verify"}
+                  </button>
+                  <button
+                    onClick={() => handleBanUser(seller.user_id, seller.is_banned)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${seller.is_banned ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive"}`}
+                  >
+                    {seller.is_banned ? "Unban" : "Ban"}
+                  </button>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -623,7 +682,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
