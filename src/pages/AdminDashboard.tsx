@@ -209,6 +209,63 @@ const AdminDashboard = () => {
     fetchProducts();
   };
 
+  const downloadCSV = (filename: string, rows: Record<string, any>[]) => {
+    if (rows.length === 0) { toast.error("Nothing to export"); return; }
+    const headers = Object.keys(rows[0]);
+    const escapeCell = (val: any) => {
+      const s = val === null || val === undefined ? "" : String(val);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) => headers.map((h) => escapeCell(row[h])).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("CSV downloaded");
+  };
+
+  const handleExportOrders = () => {
+    downloadCSV(
+      `madfod-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      orders.map((o) => ({
+        order_number: o.order_number,
+        product: o.product_title,
+        buyer: o.buyer_name,
+        seller: o.seller_name,
+        amount: o.amount,
+        shipping_charge: o.shipping_charge,
+        platform_commission: o.platform_commission,
+        seller_payout_amount: o.seller_payout_amount,
+        status: o.status,
+        payout_status: o.payout_status,
+        refund_status: o.refund_status,
+        awb_code: o.awb_code,
+        courier_name: o.courier_name,
+        created_at: o.created_at,
+      }))
+    );
+  };
+
+  const handleExportSellers = () => {
+    downloadCSV(
+      `madfod-sellers-${new Date().toISOString().slice(0, 10)}.csv`,
+      sellers.map((s) => ({
+        name: s.full_name,
+        verified: s.is_verified ? "yes" : "no",
+        banned: s.is_banned ? "yes" : "no",
+        joined: s.created_at,
+      }))
+    );
+  };
+
   const handleCheckPayments = async () => {
     setReconciling(true);
     setReconcileResult(null);
@@ -404,15 +461,23 @@ const AdminDashboard = () => {
         {tab === "orders" && (
           <div className="space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 gap-2">
                 <p className="text-xs font-bold text-foreground">Business Overview</p>
-                <button
-                  onClick={handleCheckPayments}
-                  disabled={reconciling}
-                  className="px-3 py-1.5 bg-primary text-secondary rounded-xl text-[10px] font-bold disabled:opacity-50"
-                >
-                  {reconciling ? "Checking..." : "Check Payments"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportOrders}
+                    className="px-3 py-1.5 bg-muted text-foreground rounded-xl text-[10px] font-bold"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={handleCheckPayments}
+                    disabled={reconciling}
+                    className="px-3 py-1.5 bg-primary text-secondary rounded-xl text-[10px] font-bold disabled:opacity-50"
+                  >
+                    {reconciling ? "Checking..." : "Check Payments"}
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                 {[
@@ -614,6 +679,14 @@ const AdminDashboard = () => {
         {/* Sellers Tab */}
         {tab === "sellers" && (
           <div className="space-y-3">
+            <div className="flex justify-end mb-1">
+              <button
+                onClick={handleExportSellers}
+                className="px-3 py-1.5 bg-muted text-foreground rounded-xl text-[10px] font-bold"
+              >
+                Export CSV
+              </button>
+            </div>
             {sellers.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No sellers yet</p>}
             {sellers.map((seller, i) => (
               <motion.div key={seller.user_id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
