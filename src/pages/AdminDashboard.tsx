@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -81,7 +81,7 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -89,6 +89,9 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState<{ checked: number; mismatches: number; results: any[] } | null>(null);
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   useEffect(() => {
     let channel: any;
@@ -320,6 +323,36 @@ const AdminDashboard = () => {
     setProcessingRefund(null);
   };
 
+  const handleSendBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
+      toast.error("Title aur message dono bharo");
+      return;
+    }
+    if (!window.confirm("Ye notification sabhi registered users ko bhej diya jayega. Confirm?")) return;
+    setSendingBroadcast(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`https://ieauimziqompyevwrxwo.supabase.co/functions/v1/broadcast-notification`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: broadcastTitle.trim(), message: broadcastMessage.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error || "Broadcast failed");
+        setSendingBroadcast(false);
+        return;
+      }
+      toast.success(`Bheja gaya ${data.sent_to} users ko ✅`);
+      setBroadcastTitle("");
+      setBroadcastMessage("");
+    } catch (e) {
+      toast.error("Failed to reach broadcast service");
+    }
+    setSendingBroadcast(false);
+  };
+
   const handleApprove = async (adId: string) => {
     const now = new Date();
     const ad = ads.find((a) => a.id === adId);
@@ -366,7 +399,7 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" ? ads : ads.filter((a) => a.status === tab);
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
@@ -428,7 +461,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
-          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -439,6 +472,7 @@ const AdminDashboard = () => {
               {t === "orders" && <Package className="w-3 h-3" />}
               {t === "products" && <ShoppingBag className="w-3 h-3" />}
               {t === "buyers" && <Users className="w-3 h-3" />}
+              {t === "broadcast" && <Send className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -452,10 +486,46 @@ const AdminDashboard = () => {
                 ? `(${returnOrders.length})`
                 : t === "buyers"
                 ? `(${buyersList.length})`
+                : t === "broadcast"
+                ? ""
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
           ))}
         </div>
+
+        {/* Broadcast Tab */}
+        {tab === "broadcast" && (
+          <div className="space-y-3">
+            <div className="glass-card rounded-2xl p-4 border border-border/30">
+              <p className="text-xs font-bold text-foreground mb-3">Send Notification to All Users ({sellers.length})</p>
+              <input
+                type="text"
+                value={broadcastTitle}
+                onChange={(e) => setBroadcastTitle(e.target.value)}
+                placeholder="Title (e.g. App Update)"
+                maxLength={100}
+                className="w-full px-3 py-2 rounded-xl bg-muted text-sm text-foreground mb-2 outline-none"
+              />
+              <textarea
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                placeholder="Message likho jo sabhi users ko dikhega..."
+                rows={4}
+                maxLength={500}
+                className="w-full px-3 py-2 rounded-xl bg-muted text-sm text-foreground mb-3 outline-none resize-none"
+              />
+              <button
+                onClick={handleSendBroadcast}
+                disabled={sendingBroadcast}
+                className="w-full py-2.5 bg-primary text-secondary rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {sendingBroadcast ? "Sending..." : "Send to All Users"}
+              </button>
+              <p className="text-[10px] text-muted-foreground mt-2">Ye sabhi {sellers.length} registered users ko ek saath notification bhejega. Ek baar bheja hua wapas nahi liya ja sakta.</p>
+            </div>
+          </div>
+        )}
 
         {/* Orders Tab */}
         {tab === "orders" && (
@@ -755,7 +825,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
