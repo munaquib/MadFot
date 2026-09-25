@@ -1,9 +1,40 @@
-import { ArrowLeft, Mail, MessageCircle, Clock, HelpCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Mail, MessageCircle, Clock, HelpCircle, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface Ticket {
+  id: string;
+  subject: string;
+  message: string;
+  status: string;
+  admin_reply: string | null;
+  created_at: string;
+}
 
 const ContactUs = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+
+  useEffect(() => {
+    if (user) fetchMyTickets();
+  }, [user]);
+
+  const fetchMyTickets = async () => {
+    const { data } = await supabase
+      .from("support_tickets")
+      .select("id, subject, message, status, admin_reply, created_at")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false });
+    setMyTickets((data as Ticket[]) || []);
+  };
 
   const handleWhatsApp = () => {
     window.open("https://wa.me/919229539743?text=Hi%20MadFod%20Support%2C%20I%20need%20help%20with...", "_blank");
@@ -11,6 +42,34 @@ const ContactUs = () => {
 
   const handleEmail = () => {
     window.open("mailto:support.madfod@gmail.com?subject=Support Request", "_blank");
+  };
+
+  const handleSubmitTicket = async () => {
+    if (!user) {
+      toast.error("Please login to send a message");
+      return;
+    }
+    if (!subject.trim() || !message.trim()) {
+      toast.error("Subject aur message dono bharo");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("support_tickets").insert({
+      user_id: user.id,
+      subject: subject.trim(),
+      message: message.trim(),
+      status: "open",
+    });
+    if (error) {
+      toast.error("Failed to send, try again");
+      setSubmitting(false);
+      return;
+    }
+    toast.success("Message bhej diya! Hum jaldi reply karenge ✅");
+    setSubject("");
+    setMessage("");
+    setSubmitting(false);
+    fetchMyTickets();
   };
 
   return (
@@ -66,6 +125,66 @@ const ContactUs = () => {
             </div>
           </button>
         </div>
+
+        {/* Send us a message form */}
+        <div className="glass-card rounded-2xl p-4 border border-border/30 shadow-card">
+          <h3 className="font-bold text-foreground text-sm font-serif mb-3">Send us a message</h3>
+          {!user ? (
+            <p className="text-xs text-muted-foreground">Please login to send us a message directly.</p>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Subject (e.g. Order issue)"
+                maxLength={100}
+                className="w-full px-3 py-2 rounded-xl bg-muted text-sm text-foreground mb-2 outline-none"
+              />
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Apni problem yahan likhein..."
+                rows={4}
+                maxLength={1000}
+                className="w-full px-3 py-2 rounded-xl bg-muted text-sm text-foreground mb-3 outline-none resize-none"
+              />
+              <button
+                onClick={handleSubmitTicket}
+                disabled={submitting}
+                className="w-full py-2.5 bg-primary text-secondary rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {submitting ? "Sending..." : "Send Message"}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* My previous tickets */}
+        {user && myTickets.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-bold text-foreground text-sm font-serif">Your Messages</h3>
+            {myTickets.map((t) => (
+              <div key={t.id} className="glass-card rounded-2xl p-3 border border-border/30">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold text-foreground">{t.subject}</p>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.status === "resolved" ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"}`}>
+                    {t.status === "resolved" ? "Resolved" : "Open"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{t.message}</p>
+                {t.admin_reply && (
+                  <div className="mt-2 pt-2 border-t border-border/30">
+                    <p className="text-[10px] font-semibold text-foreground">Support reply:</p>
+                    <p className="text-[11px] text-muted-foreground">{t.admin_reply}</p>
+                  </div>
+                )}
+                <p className="text-[9px] text-muted-foreground mt-1">{new Date(t.created_at).toLocaleDateString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Support Hours */}
         <div className="glass-card rounded-2xl p-4 border border-border/30 shadow-card">

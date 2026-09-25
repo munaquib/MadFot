@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send, HelpCircle as HelpCircleIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,13 +75,24 @@ interface Product {
   created_at: string;
 }
 
+interface SupportTicket {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  status: string;
+  admin_reply: string | null;
+  created_at: string;
+  user_name?: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -92,6 +103,9 @@ const AdminDashboard = () => {
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyingTicket, setReplyingTicket] = useState<string | null>(null);
 
   useEffect(() => {
     let channel: any;
@@ -106,6 +120,7 @@ const AdminDashboard = () => {
         await fetchReports();
         await fetchOrders();
         await fetchProducts();
+        await fetchTickets();
 
         // Real-time: ads, profiles, reports, orders, products table changes pe auto refresh
         channel = supabase
@@ -127,6 +142,9 @@ const AdminDashboard = () => {
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
             fetchProducts();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, () => {
+            fetchTickets();
           })
           .subscribe();
 
@@ -202,6 +220,37 @@ const AdminDashboard = () => {
     }
     const enriched = data.map((p: any) => ({ ...p, seller_name: sellerMap[p.user_id] || "Unknown" }));
     setProducts(enriched as Product[]);
+  };
+
+  const fetchTickets = async () => {
+    const { data } = await supabase
+      .from("support_tickets")
+      .select("id, user_id, subject, message, status, admin_reply, created_at")
+      .order("created_at", { ascending: false });
+    if (!data) { setTickets([]); return; }
+    const userIds = [...new Set(data.map((t: any) => t.user_id).filter(Boolean))];
+    let nameMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+      profiles?.forEach((p: any) => { nameMap[p.user_id] = p.full_name; });
+    }
+    const enriched = data.map((t: any) => ({ ...t, user_name: nameMap[t.user_id] || "Unknown" }));
+    setTickets(enriched as SupportTicket[]);
+  };
+
+  const handleReplyTicket = async (ticketId: string, markResolved: boolean) => {
+    const reply = (replyDrafts[ticketId] || "").trim();
+    if (!reply) { toast.error("Pehle reply likho"); return; }
+    setReplyingTicket(ticketId);
+    const { error } = await supabase
+      .from("support_tickets")
+      .update({ admin_reply: reply, status: markResolved ? "resolved" : "open", updated_at: new Date().toISOString() })
+      .eq("id", ticketId);
+    if (error) { toast.error("Failed to save reply"); setReplyingTicket(null); return; }
+    toast.success("Reply saved ✅");
+    setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
+    setReplyingTicket(null);
+    fetchTickets();
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -399,7 +448,9 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" || tab === "support" ? ads : ads.filter((a) => a.status === tab);
+
+  const openTicketsCount = tickets.filter((t) => t.status !== "resolved").length;
 
   const needsAttentionOrders = orders.filter((o) => !!o.shiprocket_error || (o.shiprocket_status || "").toLowerCase().includes("fail"));
 
@@ -461,7 +512,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
-          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast", "support"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -473,6 +524,7 @@ const AdminDashboard = () => {
               {t === "products" && <ShoppingBag className="w-3 h-3" />}
               {t === "buyers" && <Users className="w-3 h-3" />}
               {t === "broadcast" && <Send className="w-3 h-3" />}
+              {t === "support" && <HelpCircleIcon className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -486,6 +538,8 @@ const AdminDashboard = () => {
                 ? `(${returnOrders.length})`
                 : t === "buyers"
                 ? `(${buyersList.length})`
+                : t === "support"
+                ? `(${openTicketsCount})`
                 : t === "broadcast"
                 ? ""
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
@@ -524,6 +578,64 @@ const AdminDashboard = () => {
               </button>
               <p className="text-[10px] text-muted-foreground mt-2">Ye sabhi {sellers.length} registered users ko ek saath notification bhejega. Ek baar bheja hua wapas nahi liya ja sakta.</p>
             </div>
+          </div>
+        )}
+
+        {/* Support Tab */}
+        {tab === "support" && (
+          <div className="space-y-3">
+            {tickets.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No support messages yet</p>
+            ) : (
+              tickets.map((t, i) => (
+                <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-foreground">{t.subject}</p>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.status === "resolved" ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"}`}>
+                      {t.status === "resolved" ? "Resolved" : "Open"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mb-1">From: <span className="text-foreground font-medium">{t.user_name}</span></p>
+                  <p className="text-[11px] text-foreground">{t.message}</p>
+                  {t.admin_reply && (
+                    <div className="mt-2 pt-2 border-t border-border/30">
+                      <p className="text-[10px] font-semibold text-foreground">Your reply:</p>
+                      <p className="text-[11px] text-muted-foreground">{t.admin_reply}</p>
+                    </div>
+                  )}
+                  {t.status !== "resolved" && (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={replyDrafts[t.id] || ""}
+                        onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                        placeholder="Reply likhein..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-xl bg-muted text-xs text-foreground outline-none resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleReplyTicket(t.id, false)}
+                          disabled={replyingTicket === t.id}
+                          className="flex-1 py-1.5 bg-muted text-foreground rounded-xl text-[10px] font-bold disabled:opacity-50"
+                        >
+                          Save Reply
+                        </button>
+                        <button
+                          onClick={() => handleReplyTicket(t.id, true)}
+                          disabled={replyingTicket === t.id}
+                          className="flex-1 py-1.5 bg-primary text-secondary rounded-xl text-[10px] font-bold disabled:opacity-50"
+                        >
+                          Reply & Resolve
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[9px] text-muted-foreground mt-1">{new Date(t.created_at).toLocaleDateString()}</p>
+                </motion.div>
+              ))
+            )}
           </div>
         )}
 
@@ -825,7 +937,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && tab !== "support" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
