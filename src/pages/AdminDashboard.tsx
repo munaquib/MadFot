@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send, HelpCircle as HelpCircleIcon, Tag } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send, HelpCircle as HelpCircleIcon, Tag, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,7 +44,9 @@ interface Report {
 interface Order {
   id: string;
   order_number: string;
+  product_id?: string;
   product_title: string;
+  category?: string;
   buyer_name: string;
   seller_id: string;
   seller_name?: string;
@@ -106,7 +108,7 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support" | "coupons">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support" | "coupons" | "analytics">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -218,7 +220,7 @@ const AdminDashboard = () => {
   const fetchOrders = async () => {
     const { data } = await supabase
       .from("orders")
-      .select("id, order_number, product_title, buyer_name, seller_id, amount, shipping_charge, platform_commission, seller_payout_amount, status, payout_status, refund_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
+      .select("id, order_number, product_id, product_title, buyer_name, seller_id, amount, shipping_charge, platform_commission, seller_payout_amount, status, payout_status, refund_status, awb_code, courier_name, shiprocket_status, shiprocket_error, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (!data) { setOrders([]); return; }
@@ -228,7 +230,13 @@ const AdminDashboard = () => {
       const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", sellerIds);
       profiles?.forEach((p: any) => { sellerMap[p.user_id] = p.full_name; });
     }
-    const enriched = data.map((o: any) => ({ ...o, seller_name: sellerMap[o.seller_id] || "Unknown" }));
+    const productIds = [...new Set(data.map((o: any) => o.product_id).filter(Boolean))];
+    let categoryMap: Record<string, string> = {};
+    if (productIds.length > 0) {
+      const { data: prods } = await supabase.from("products").select("id, category").in("id", productIds);
+      prods?.forEach((p: any) => { categoryMap[p.id] = p.category; });
+    }
+    const enriched = data.map((o: any) => ({ ...o, seller_name: sellerMap[o.seller_id] || "Unknown", category: categoryMap[o.product_id] || "Other" }));
     setOrders(enriched as Order[]);
   };
 
@@ -523,7 +531,7 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" || tab === "support" || tab === "coupons" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" || tab === "support" || tab === "coupons" || tab === "analytics" ? ads : ads.filter((a) => a.status === tab);
 
   const openTicketsCount = tickets.filter((t) => t.status !== "resolved").length;
 
@@ -547,6 +555,34 @@ const AdminDashboard = () => {
     totalCommission: validOrders.reduce((sum, o) => sum + (Number(o.platform_commission) || 0), 0),
     totalPayout: validOrders.reduce((sum, o) => sum + (Number(o.seller_payout_amount) || 0), 0),
   };
+
+  // Analytics — sab existing orders/products data se, koi naya query nahi
+  const categoryStats: Record<string, { count: number; revenue: number }> = {};
+  validOrders.forEach((o) => {
+    const cat = o.category || "Other";
+    if (!categoryStats[cat]) categoryStats[cat] = { count: 0, revenue: 0 };
+    categoryStats[cat].count += 1;
+    categoryStats[cat].revenue += Number(o.amount) || 0;
+  });
+  const topCategories = Object.entries(categoryStats).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+  const maxCategoryCount = topCategories.length > 0 ? topCategories[0][1].count : 1;
+
+  const sellerStats: Record<string, { name: string; count: number; revenue: number }> = {};
+  validOrders.forEach((o) => {
+    const key = o.seller_id;
+    if (!sellerStats[key]) sellerStats[key] = { name: o.seller_name || "Unknown", count: 0, revenue: 0 };
+    sellerStats[key].count += 1;
+    sellerStats[key].revenue += Number(o.amount) || 0;
+  });
+  const topSellersAnalytics = Object.values(sellerStats).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const maxSellerRevenue = topSellersAnalytics.length > 0 ? topSellersAnalytics[0].revenue : 1;
+
+  const statusBreakdown: Record<string, number> = {};
+  orders.forEach((o) => {
+    statusBreakdown[o.status] = (statusBreakdown[o.status] || 0) + 1;
+  });
+  const statusEntries = Object.entries(statusBreakdown).sort((a, b) => b[1] - a[1]);
+  const maxStatusCount = statusEntries.length > 0 ? statusEntries[0][1] : 1;
 
   if (loading) return <AppLayout><div className="min-h-screen flex items-center justify-center"><div className="text-secondary font-semibold">Loading...</div></div></AppLayout>;
 
@@ -587,7 +623,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
-          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast", "support", "coupons"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast", "support", "coupons", "analytics"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -601,6 +637,7 @@ const AdminDashboard = () => {
               {t === "broadcast" && <Send className="w-3 h-3" />}
               {t === "support" && <HelpCircleIcon className="w-3 h-3" />}
               {t === "coupons" && <Tag className="w-3 h-3" />}
+              {t === "analytics" && <BarChart3 className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -618,7 +655,7 @@ const AdminDashboard = () => {
                 ? `(${openTicketsCount})`
                 : t === "coupons"
                 ? `(${coupons.length})`
-                : t === "broadcast"
+                : t === "broadcast" || t === "analytics"
                 ? ""
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
             </button>
@@ -656,6 +693,70 @@ const AdminDashboard = () => {
               </button>
               <p className="text-[10px] text-muted-foreground mt-2">Ye sabhi {sellers.length} registered users ko ek saath notification bhejega. Ek baar bheja hua wapas nahi liya ja sakta.</p>
             </div>
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {tab === "analytics" && (
+          <div className="space-y-5">
+            {validOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Not enough order data yet — analytics will fill up as orders come in.</p>
+            ) : (
+              <>
+                <div>
+                  <p className="text-xs font-bold text-foreground mb-2">Top Categories</p>
+                  <div className="space-y-2">
+                    {topCategories.map(([cat, stat]) => (
+                      <div key={cat} className="glass-card rounded-xl p-2.5 border border-border/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-foreground">{cat}</span>
+                          <span className="text-[10px] text-muted-foreground">{stat.count} orders · ₹{stat.revenue.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${(stat.count / maxCategoryCount) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-foreground mb-2">Top Sellers</p>
+                  <div className="space-y-2">
+                    {topSellersAnalytics.map((s, i) => (
+                      <div key={s.name + i} className="glass-card rounded-xl p-2.5 border border-border/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-foreground">{s.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.count} orders · ₹{s.revenue.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-secondary rounded-full" style={{ width: `${(s.revenue / maxSellerRevenue) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-foreground mb-2">Order Status Breakdown</p>
+                  <div className="space-y-2">
+                    {statusEntries.map(([status, count]) => (
+                      <div key={status} className="glass-card rounded-xl p-2.5 border border-border/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-foreground capitalize">{status}</span>
+                          <span className="text-[10px] text-muted-foreground">{count} order{count !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${status === "delivered" ? "bg-primary" : status === "cancelled" ? "bg-destructive" : "bg-secondary"}`} style={{ width: `${(count / maxStatusCount) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground text-center pt-1">Based on the last {orders.length} orders loaded in the Orders tab.</p>
+              </>
+            )}
           </div>
         )}
 
@@ -1126,7 +1227,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && tab !== "support" && tab !== "coupons" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && tab !== "support" && tab !== "coupons" && tab !== "analytics" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>
