@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Heart, Share2, MapPin, Shield, MessageCircle, CreditCard, ShieldCheck, ChevronLeft, ChevronRight, X, IndianRupee, Send, Trash2, Megaphone, Truck, BadgeCheck, MoreVertical, Flag, Ban, CheckCircle2, Tag } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
@@ -55,6 +55,11 @@ const ProductDetail = () => {
   const [addressState, setAddressState] = useState("");
   const [addressPincode, setAddressPincode] = useState("");
 
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
 
   const [showSellerMenu, setShowSellerMenu] = useState(false);
@@ -95,17 +100,6 @@ const ProductDetail = () => {
             const { data: wl } = await supabase.from("wishlist").select("id").eq("user_id", user.id).eq("product_id", id).maybeSingle();
             setInWishlist(!!wl);
 
-            // Check if this buyer already has an order (non-rental) for this product,
-            // so we can show "Already Purchased" instead of "Buy Now".
-            //
-            // Fix: pehle ye check sirf EK BAAR hota tha. Payment success hone ke turant
-            // baad Cashfree ka modal remount trigger karta hai, aur us waqt tak webhook
-            // ne "orders" table mein row insert nahi kiya hota (usme 1-5 sec lag sakte
-            // hain). Isse "Already Purchased" turant wapas "Buy Now" mein badal jata tha.
-            //
-            // Ab agar user abhi-abhi payment karke aaya hai (sessionStorage flag), toh
-            // ek single check ki jagah kuch retries karte hain (2 sec gap, 6 attempts =
-            // 12 sec tak) jab tak order database mein confirm na ho jaye.
             const justPurchasedKey = `recent_purchase_${id}`;
             const justPurchased = sessionStorage.getItem(justPurchasedKey) === "1";
 
@@ -147,7 +141,6 @@ const ProductDetail = () => {
             setHasPurchased(purchased);
             setPurchaseChecked(true);
 
-            // Buyer ka phone number profile se fetch karo (Cashfree order ke liye use hoga)
             const { data: buyerProf } = await supabase
               .from("profiles")
               .select("phone")
@@ -158,11 +151,6 @@ const ProductDetail = () => {
             setPurchaseChecked(true);
           }
 
-          // Track view — fire and forget, loading block nahi karega.
-          // Fix: Supabase queries kabhi "reject" nahi hoti (.catch() ka pichla tarika kabhi
-          // chalta hi nahi tha, chahe increment_views function exist kare ya na kare) —
-          // isliye view count kabhi badhta nahi tha, silently fail ho raha tha.
-          // Ab seedha manual update karte hain aur { error } ko check karke hi log karte hain.
           supabase
             .from("products")
             .update({ views_count: (data.views_count || 0) + 1 })
@@ -252,11 +240,72 @@ const ProductDetail = () => {
       navigate("/profile");
       return;
     }
-    // Delivery address lena hai — checkout se pehle ek chhota form dikhate hain,
-    // taaki seller ko pata chale order kaha deliver karna hai.
     setAddressName(user.user_metadata?.full_name || "");
     setAddressPhone(buyerPhone);
+    setCouponCode("");
+    setAppliedCoupon(null);
+    setCouponError("");
     setShowAddressDialog(true);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || !product) return;
+    setApplyingCoupon(true);
+    setCouponError("");
+    try {
+      const code = couponCode.trim().toUpperCase();
+      const { data: coupon, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", code)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error || !coupon) {
+        setCouponError("Invalid or inactive coupon code");
+        setAppliedCoupon(null);
+        return;
+      }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        setCouponError("This coupon has expired");
+        setAppliedCoupon(null);
+        return;
+      }
+      if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) {
+        setCouponError("This coupon has reached its usage limit");
+        setAppliedCoupon(null);
+        return;
+      }
+      const itemPrice = Number(product.price);
+      if (itemPrice < Number(coupon.min_order_amount || 0)) {
+        setCouponError(`Minimum order amount for this coupon is ₹${coupon.min_order_amount}`);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      let discount = 0;
+      if (coupon.discount_type === "percentage") {
+        discount = (itemPrice * Number(coupon.discount_value)) / 100;
+        if (coupon.max_discount) discount = Math.min(discount, Number(coupon.max_discount));
+      } else {
+        discount = Number(coupon.discount_value);
+      }
+      discount = Math.min(discount, itemPrice);
+      discount = Math.round(discount * 100) / 100;
+
+      setAppliedCoupon({ code: coupon.code, discount });
+      toast.success(`Coupon applied! ₹${discount} off 🎉`);
+    } catch {
+      setCouponError("Failed to apply coupon, try again");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError("");
   };
 
   const handleConfirmAddressAndPay = async () => {
@@ -272,7 +321,6 @@ const ProductDetail = () => {
     await trackAdClick();
     setPaying(true);
     try {
-      // Amount yahan se nahi bhejte: server database se product price + shipping khud calculate karta hai.
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-order`, {
         method: "POST",
         headers: {
@@ -290,6 +338,7 @@ const ProductDetail = () => {
           delivery_city: addressCity.trim(),
           delivery_state: addressState.trim(),
           delivery_pincode: addressPincode.trim(),
+          coupon_code: appliedCoupon?.code || undefined,
         }),
       });
       const data = await res.json();
@@ -303,8 +352,6 @@ const ProductDetail = () => {
         if (result.error) { toast.error("Payment failed: " + result.error.message); }
         else if (result.paymentDetails) {
           toast.success("Payment successful! 🎉 Order placed.");
-          // Fix: flag set karo taaki remount ke baad ka check webhook ka wait kare
-          // (retry kare) instead of turant "Buy Now" pe wapas aa jaane ke.
           sessionStorage.setItem(`recent_purchase_${product.id}`, "1");
           setHasPurchased(true);
         }
@@ -360,7 +407,6 @@ const ProductDetail = () => {
     if (!confirmed) return;
     setCancelling(true);
     try {
-      // Server function pehle courier shipment cancel karta hai, phir order cancel karta hai
       const { data, error } = await supabase.functions.invoke("cancel-order", { body: { order_id: existingOrderId } });
       if (error) {
         let msg = error.message;
@@ -392,12 +438,6 @@ const ProductDetail = () => {
       navigate("/profile");
       return;
     }
-    // Agar is product pe pehle se koi order ho chuka hai, toh database delete ko
-    // block karta hai (order history preserve karne ke liye — Postgres foreign key
-    // constraint error, code 23503). Us case mein hum product ko permanently delete
-    // karne ki jagah "inactive" kar dete hain — jaise Amazon/Flipkart "unlist" karte
-    // hain. Isse product turant sabko dikhna band ho jata hai, lekin order history
-    // (jo purane buyers ke paas hai) safe rehta hai.
     if ((error as any).code === "23503") {
       const { error: updateErr } = await supabase.from("products").update({ status: "inactive" }).eq("id", product.id);
       if (updateErr) {
@@ -492,7 +532,8 @@ const ProductDetail = () => {
 
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
   const isOwner = !!(user && product?.user_id === user.id);
-  const totalPayable = (product?.price || 0) + SHIPPING_CHARGE;
+  const couponDiscount = appliedCoupon?.discount || 0;
+  const totalPayable = (product?.price || 0) - couponDiscount + SHIPPING_CHARGE;
 
   return (
     <AppLayout>
@@ -877,11 +918,48 @@ const ProductDetail = () => {
               />
             </div>
 
+            {/* Coupon */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Coupon Code</label>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-xl px-4 py-2.5">
+                  <span className="text-sm font-bold text-primary flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5" /> {appliedCoupon.code} applied — ₹{appliedCoupon.discount} off
+                  </span>
+                  <button onClick={handleRemoveCoupon} className="text-xs text-destructive font-semibold">Remove</button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
+                    placeholder="Enter coupon code"
+                    className="flex-1 bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                  />
+                  <button
+                    onClick={handleApplyCoupon}
+                    disabled={applyingCoupon || !couponCode.trim()}
+                    className="px-4 py-2.5 bg-secondary text-secondary-foreground rounded-xl text-xs font-bold disabled:opacity-50"
+                  >
+                    {applyingCoupon ? "..." : "Apply"}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="text-[10px] text-destructive mt-1">{couponError}</p>}
+            </div>
+
             <div className="bg-secondary/5 rounded-xl p-3 border border-secondary/20 space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Product</span>
                 <span className="font-semibold">₹{product?.price?.toLocaleString("en-IN")}</span>
               </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-primary">Coupon Discount</span>
+                  <span className="font-semibold text-primary">-₹{couponDiscount.toLocaleString("en-IN")}</span>
+                </div>
+              )}
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Delivery</span>
                 <span className="font-semibold">₹{SHIPPING_CHARGE}</span>

@@ -206,7 +206,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ received: true, note: "already processed" }), { status: 200 });
     }
 
-    // payment_orders.amount = product price + shipping. Seller ka hisaab sirf product price pe.
+    // payment_orders.amount = product price - coupon discount + shipping. Seller ka hisaab sirf (product price - discount) pe.
     const shippingCharge = Number(pendingOrder.shipping_charge || 0);
     const itemAmount = Math.round((Number(pendingOrder.amount) - shippingCharge) * 100) / 100;
     const commission = Math.round(itemAmount * COMMISSION_RATE * 100) / 100;
@@ -265,6 +265,23 @@ serve(async (req) => {
 
     // Duplicate webhook se bachne ke liye pehle hi "completed" mark karo
     await supabase.from("payment_orders").update({ status: "completed" }).eq("cf_order_id", cfOrderId);
+
+    // Coupon ka used_count sirf ab badhao — payment SUCCESS confirm ho chuki hai
+    // (order create hote waqt nahi, jab cancel/fail hone ka risk hota hai).
+    // "already processed" check upar ho chuka hai isliye ye ek hi baar chalega.
+    if (pendingOrder.coupon_code) {
+      const { data: currentCoupon } = await supabase
+        .from("coupons")
+        .select("used_count")
+        .eq("code", pendingOrder.coupon_code)
+        .maybeSingle();
+      if (currentCoupon) {
+        await supabase
+          .from("coupons")
+          .update({ used_count: (currentCoupon.used_count || 0) + 1 })
+          .eq("code", pendingOrder.coupon_code);
+      }
+    }
 
     // Shiprocket ka kaam background mein (webhook turant 200 de deta hai)
     const shipmentTask = createShipment(supabase, newOrder, pendingOrder, cfOrderId);

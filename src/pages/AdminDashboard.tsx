@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send, HelpCircle as HelpCircleIcon } from "lucide-react";
+import { ShieldCheck, Check, X, Megaphone, Eye, MousePointer, IndianRupee, Trash2, ArrowLeft, BadgeCheck, Users, Flag, Package, AlertTriangle, ShoppingBag, Send, HelpCircle as HelpCircleIcon, Tag } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,13 +86,27 @@ interface SupportTicket {
   user_name?: string;
 }
 
+interface CouponRow {
+  id: string;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  min_order_amount: number;
+  max_discount: number | null;
+  usage_limit: number | null;
+  used_count: number;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support">("pending");
+  const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support" | "coupons">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -106,6 +120,15 @@ const AdminDashboard = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [replyingTicket, setReplyingTicket] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<CouponRow[]>([]);
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponType, setNewCouponType] = useState<"percentage" | "flat">("percentage");
+  const [newCouponValue, setNewCouponValue] = useState("");
+  const [newCouponMinOrder, setNewCouponMinOrder] = useState("");
+  const [newCouponMaxDiscount, setNewCouponMaxDiscount] = useState("");
+  const [newCouponUsageLimit, setNewCouponUsageLimit] = useState("");
+  const [newCouponExpiry, setNewCouponExpiry] = useState("");
+  const [creatingCoupon, setCreatingCoupon] = useState(false);
 
   useEffect(() => {
     let channel: any;
@@ -121,6 +144,7 @@ const AdminDashboard = () => {
         await fetchOrders();
         await fetchProducts();
         await fetchTickets();
+        await fetchCoupons();
 
         // Real-time: ads, profiles, reports, orders, products table changes pe auto refresh
         channel = supabase
@@ -145,6 +169,9 @@ const AdminDashboard = () => {
           })
           .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, () => {
             fetchTickets();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "coupons" }, () => {
+            fetchCoupons();
           })
           .subscribe();
 
@@ -251,6 +278,54 @@ const AdminDashboard = () => {
     setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
     setReplyingTicket(null);
     fetchTickets();
+  };
+
+  const fetchCoupons = async () => {
+    const { data } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
+    setCoupons((data as CouponRow[]) || []);
+  };
+
+  const handleCreateCoupon = async () => {
+    if (!newCouponCode.trim() || !newCouponValue.trim() || Number(newCouponValue) <= 0) {
+      toast.error("Code aur discount value bharo");
+      return;
+    }
+    setCreatingCoupon(true);
+    const { error } = await supabase.from("coupons").insert({
+      code: newCouponCode.trim().toUpperCase(),
+      discount_type: newCouponType,
+      discount_value: Number(newCouponValue),
+      min_order_amount: newCouponMinOrder ? Number(newCouponMinOrder) : 0,
+      max_discount: newCouponMaxDiscount ? Number(newCouponMaxDiscount) : null,
+      usage_limit: newCouponUsageLimit ? Number(newCouponUsageLimit) : null,
+      expires_at: newCouponExpiry ? new Date(newCouponExpiry).toISOString() : null,
+      is_active: true,
+    });
+    if (error) {
+      toast.error(error.code === "23505" ? "Ye coupon code already exist karta hai" : "Failed to create coupon");
+      setCreatingCoupon(false);
+      return;
+    }
+    toast.success("Coupon created ✅");
+    setNewCouponCode(""); setNewCouponValue(""); setNewCouponMinOrder("");
+    setNewCouponMaxDiscount(""); setNewCouponUsageLimit(""); setNewCouponExpiry("");
+    setCreatingCoupon(false);
+    fetchCoupons();
+  };
+
+  const handleToggleCoupon = async (couponId: string, currentStatus: boolean) => {
+    const { error } = await supabase.from("coupons").update({ is_active: !currentStatus }).eq("id", couponId);
+    if (error) { toast.error("Failed to update"); return; }
+    toast.success(!currentStatus ? "Coupon activated ✅" : "Coupon deactivated");
+    fetchCoupons();
+  };
+
+  const handleDeleteCoupon = async (couponId: string) => {
+    if (!window.confirm("Delete this coupon?")) return;
+    const { error } = await supabase.from("coupons").delete().eq("id", couponId);
+    if (error) { toast.error("Failed to delete"); return; }
+    toast.success("Coupon deleted");
+    fetchCoupons();
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -448,7 +523,7 @@ const AdminDashboard = () => {
     fetchReports();
   };
 
-  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" || tab === "support" ? ads : ads.filter((a) => a.status === tab);
+  const filteredAds = tab === "all" || tab === "sellers" || tab === "reports" || tab === "orders" || tab === "products" || tab === "returns" || tab === "buyers" || tab === "broadcast" || tab === "support" || tab === "coupons" ? ads : ads.filter((a) => a.status === tab);
 
   const openTicketsCount = tickets.filter((t) => t.status !== "resolved").length;
 
@@ -512,7 +587,7 @@ const AdminDashboard = () => {
       <div className="px-4 md:px-6 mt-4">
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4 md:flex-wrap md:overflow-visible">
-          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast", "support"] as const).map((t) => (
+          {(["pending", "active", "expired", "all", "orders", "products", "returns", "buyers", "sellers", "reports", "broadcast", "support", "coupons"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -525,6 +600,7 @@ const AdminDashboard = () => {
               {t === "buyers" && <Users className="w-3 h-3" />}
               {t === "broadcast" && <Send className="w-3 h-3" />}
               {t === "support" && <HelpCircleIcon className="w-3 h-3" />}
+              {t === "coupons" && <Tag className="w-3 h-3" />}
               {t}{" "}
               {t === "sellers"
                 ? `(${sellers.length})`
@@ -540,6 +616,8 @@ const AdminDashboard = () => {
                 ? `(${buyersList.length})`
                 : t === "support"
                 ? `(${openTicketsCount})`
+                : t === "coupons"
+                ? `(${coupons.length})`
                 : t === "broadcast"
                 ? ""
                 : `(${t === "all" ? ads.length : ads.filter((a) => a.status === t).length})`}
@@ -578,6 +656,117 @@ const AdminDashboard = () => {
               </button>
               <p className="text-[10px] text-muted-foreground mt-2">Ye sabhi {sellers.length} registered users ko ek saath notification bhejega. Ek baar bheja hua wapas nahi liya ja sakta.</p>
             </div>
+          </div>
+        )}
+
+        {/* Coupons Tab */}
+        {tab === "coupons" && (
+          <div className="space-y-4">
+            <div className="glass-card rounded-2xl p-4 border border-border/30">
+              <p className="text-xs font-bold text-foreground mb-3">Create New Coupon</p>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newCouponCode}
+                  onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                  placeholder="CODE (e.g. DIWALI10)"
+                  className="col-span-2 px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                />
+                <select
+                  value={newCouponType}
+                  onChange={(e) => setNewCouponType(e.target.value as "percentage" | "flat")}
+                  className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                >
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="flat">Flat (₹)</option>
+                </select>
+                <input
+                  type="number"
+                  value={newCouponValue}
+                  onChange={(e) => setNewCouponValue(e.target.value)}
+                  placeholder={newCouponType === "percentage" ? "e.g. 10" : "e.g. 100"}
+                  className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                />
+                <input
+                  type="number"
+                  value={newCouponMinOrder}
+                  onChange={(e) => setNewCouponMinOrder(e.target.value)}
+                  placeholder="Min order ₹ (optional)"
+                  className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                />
+                {newCouponType === "percentage" && (
+                  <input
+                    type="number"
+                    value={newCouponMaxDiscount}
+                    onChange={(e) => setNewCouponMaxDiscount(e.target.value)}
+                    placeholder="Max discount ₹ (optional)"
+                    className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                  />
+                )}
+                <input
+                  type="number"
+                  value={newCouponUsageLimit}
+                  onChange={(e) => setNewCouponUsageLimit(e.target.value)}
+                  placeholder="Usage limit (optional)"
+                  className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                />
+                <input
+                  type="date"
+                  value={newCouponExpiry}
+                  onChange={(e) => setNewCouponExpiry(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-muted text-sm text-foreground outline-none"
+                />
+              </div>
+              <button
+                onClick={handleCreateCoupon}
+                disabled={creatingCoupon}
+                className="w-full py-2.5 bg-primary text-secondary rounded-xl text-sm font-bold disabled:opacity-50"
+              >
+                {creatingCoupon ? "Creating..." : "Create Coupon"}
+              </button>
+            </div>
+
+            {coupons.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No coupons yet</p>
+            ) : (
+              <div className="space-y-2">
+                {coupons.map((c) => (
+                  <div key={c.id} className="glass-card rounded-2xl p-3 border border-border/30">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" /> {c.code}
+                      </p>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${c.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {c.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {c.discount_type === "percentage" ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                      {c.max_discount ? ` (max ₹${c.max_discount})` : ""}
+                      {c.min_order_amount > 0 ? ` · min order ₹${c.min_order_amount}` : ""}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Used {c.used_count}{c.usage_limit ? ` / ${c.usage_limit}` : ""} times
+                      {c.expires_at ? ` · expires ${new Date(c.expires_at).toLocaleDateString()}` : ""}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleToggleCoupon(c.id, c.is_active)}
+                        className="flex-1 py-1.5 bg-muted text-foreground rounded-xl text-[10px] font-bold"
+                      >
+                        {c.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCoupon(c.id)}
+                        className="flex-1 py-1.5 bg-destructive/10 text-destructive rounded-xl text-[10px] font-bold"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -937,7 +1126,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Ads Tabs */}
-        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && tab !== "support" && (
+        {tab !== "sellers" && tab !== "reports" && tab !== "orders" && tab !== "products" && tab !== "returns" && tab !== "buyers" && tab !== "broadcast" && tab !== "support" && tab !== "coupons" && (
           <>
             {filteredAds.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No {tab} ads</p>

@@ -18,6 +18,7 @@ serve(async (req) => {
     const {
       product_id, buyer_id, buyer_email, buyer_name, buyer_phone,
       delivery_address, delivery_city, delivery_state, delivery_pincode,
+      coupon_code,
     } = await req.json();
 
     if (!product_id || !buyer_id) {
@@ -52,7 +53,47 @@ serve(async (req) => {
     }
 
     const itemPrice = Number(product.price);
-    const totalAmount = itemPrice + SHIPPING_CHARGE;
+    let discountAmount = 0;
+    let appliedCouponCode: string | null = null;
+
+    // Coupon validation — sab kuch server-side, taaki koi client se discount tamper na kar sake.
+    if (coupon_code && typeof coupon_code === "string" && coupon_code.trim()) {
+      const code = coupon_code.trim().toUpperCase();
+      const { data: coupon, error: couponErr } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", code)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (couponErr || !coupon) {
+        throw new Error("Invalid or inactive coupon code");
+      }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        throw new Error("This coupon has expired");
+      }
+      if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) {
+        throw new Error("This coupon has reached its usage limit");
+      }
+      if (itemPrice < Number(coupon.min_order_amount || 0)) {
+        throw new Error(`Minimum order amount for this coupon is ₹${coupon.min_order_amount}`);
+      }
+
+      if (coupon.discount_type === "percentage") {
+        discountAmount = (itemPrice * Number(coupon.discount_value)) / 100;
+        if (coupon.max_discount) {
+          discountAmount = Math.min(discountAmount, Number(coupon.max_discount));
+        }
+      } else {
+        discountAmount = Number(coupon.discount_value);
+      }
+      // Discount kabhi bhi item price se zyada nahi ho sakta (shipping discount nahi hota)
+      discountAmount = Math.min(discountAmount, itemPrice);
+      discountAmount = Math.round(discountAmount * 100) / 100;
+      appliedCouponCode = coupon.code;
+    }
+
+    const totalAmount = itemPrice - discountAmount + SHIPPING_CHARGE;
     const seller_id = product.user_id;
 
     const orderId = `MF_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -90,7 +131,7 @@ serve(async (req) => {
       throw new Error(data.message || "Failed to create order");
     }
 
-    // amount = total jo buyer ne diya (price + shipping). shipping_charge alag save hota hai.
+    // amount = total jo buyer ne diya (price - discount + shipping). shipping_charge alag save hota hai.
     const { data: insertedRow, error: dbError } = await supabase
       .from("payment_orders")
       .insert({
@@ -100,6 +141,8 @@ serve(async (req) => {
         seller_id,
         amount: totalAmount,
         shipping_charge: SHIPPING_CHARGE,
+        coupon_code: appliedCouponCode,
+        discount_amount: discountAmount,
         product_title: product.title || "MadFod Purchase",
         status: "pending",
         buyer_name: buyer_name || null,
@@ -120,11 +163,16 @@ serve(async (req) => {
       console.error("payment_orders insert returned no row (unexpected):", orderId);
     }
 
+    // Note: coupon ka used_count yahan NAHI badhaya jata — sirf tab badhega jab
+    // cashfree-webhook mein payment SUCCESS confirm ho jaye. Isse cancelled/failed
+    // payment attempts coupon ka usage limit consume nahi karte.
+
     return new Response(
       JSON.stringify({
         order_id: data.order_id,
         payment_session_id: data.payment_session_id,
         order_amount: data.order_amount,
+        discount_amount: discountAmount,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
