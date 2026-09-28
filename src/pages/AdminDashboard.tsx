@@ -188,7 +188,7 @@ const AdminDashboard = () => {
   }, [user]);
 
   const fetchAds = async () => {
-    const { data } = await supabase.from("ads").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("ads").select("*").neq("status", "awaiting_payment").order("created_at", { ascending: false });
     setAds((data as Ad[]) || []);
   };
 

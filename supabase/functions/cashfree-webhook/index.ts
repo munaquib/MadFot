@@ -191,6 +191,49 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Ad ka payment (order id "AD_" se shuru hota hai) — product orders se alag handle hota hai.
+    if (String(cfOrderId).startsWith("AD_")) {
+      const { data: ad } = await supabase
+        .from("ads")
+        .select("id, user_id, ad_title, budget, payment_status")
+        .eq("cf_order_id", cfOrderId)
+        .maybeSingle();
+
+      if (!ad) {
+        console.error("ads record not found for", cfOrderId);
+        return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+      if (ad.payment_status === "paid") {
+        return new Response(JSON.stringify({ received: true, note: "already processed" }), { status: 200 });
+      }
+
+      // Cashfree ne jitna paisa liya wo ad ki price se kam na ho
+      const paidAmount = Number(payload.data?.order?.order_amount);
+      if (Number.isFinite(paidAmount) && paidAmount + 0.001 < Number(ad.budget)) {
+        console.error("Ad payment amount mismatch", cfOrderId, paidAmount, ad.budget);
+        return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+
+      // Sirf tab update ho jab abhi tak unpaid ho (duplicate webhook se double notification na jaye)
+      const { data: updated } = await supabase
+        .from("ads")
+        .update({ payment_status: "paid", status: "pending" })
+        .eq("id", ad.id)
+        .eq("payment_status", "unpaid")
+        .select("id");
+
+      if (updated && updated.length > 0) {
+        await supabase.from("notifications").insert({
+          user_id: ad.user_id,
+          title: "Ad payment received ✅",
+          message: `Your ad "${ad.ad_title}" is under review. It will go live once approved.`,
+          type: "ad",
+          is_read: false,
+        });
+      }
+      return new Response(JSON.stringify({ received: true }), { status: 200 });
+    }
+
     const { data: pendingOrder, error: fetchErr } = await supabase
       .from("payment_orders")
       .select("*")

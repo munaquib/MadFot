@@ -217,18 +217,23 @@ const ProductDetail = () => {
 
   const trackAdClick = async () => {
     if (!id) return;
-    const { data: activeAd } = await supabase
-      .from("ads")
-      .select("id")
-      .eq("product_id", id)
-      .eq("status", "active")
-      .maybeSingle();
-    if (activeAd?.id) {
-      await supabase.from("ad_analytics").insert({
-        ad_id: activeAd.id,
-        event_type: "click",
-        user_id: user?.id || null,
-      }).catch(() => {});
+    // Analytics ki koi bhi galti payment ko rokna nahi chahiye, isliye poora try/catch mein hai
+    try {
+      const { data: activeAd } = await supabase
+        .from("ads")
+        .select("id")
+        .eq("product_id", id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (activeAd?.id) {
+        await supabase.from("ad_analytics").insert({
+          ad_id: activeAd.id,
+          event_type: "click",
+          user_id: user?.id || null,
+        });
+      }
+    } catch (e) {
+      console.error("Ad click tracking failed:", e);
     }
   };
 

@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Megaphone, Upload, Image, Eye, IndianRupee, Loader2 } from "lucide-react";
+import { Megaphone, Upload, Eye, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -17,10 +17,16 @@ const placements = [
 ];
 
 const durations = [
-  { days: 1, label: "1 Day", price: 49 },
-  { days: 3, label: "3 Days", price: 129 },
-  { days: 7, label: "7 Days", price: 249 },
+  { days: 1, label: "1 Day" },
+  { days: 3, label: "3 Days" },
+  { days: 7, label: "7 Days" },
 ];
+
+// Sirf dikhane ke liye. Asli price server (ad-order function) tay karta hai — dono jagah same rakhna.
+const adPrices: Record<string, Record<number, number>> = {
+  "top-banner": { 1: 99, 3: 249, 7: 499 },
+  "in-feed": { 1: 49, 3: 129, 7: 249 },
+};
 
 const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
   const { user } = useAuth();
@@ -29,22 +35,18 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
   const [description, setDescription] = useState("");
   const [placement, setPlacement] = useState("in-feed");
   const [durationDays, setDurationDays] = useState(3);
-  const [budget, setBudget] = useState(129);
   const [bannerImage, setBannerImage] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const price = adPrices[placement]?.[durationDays] ?? 0;
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setBannerImage(file);
     setBannerPreview(URL.createObjectURL(file));
-  };
-
-  const handleDurationSelect = (d: typeof durations[number]) => {
-    setDurationDays(d.days);
-    setBudget(d.price);
   };
 
   const handleSubmit = async () => {
@@ -64,55 +66,46 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
         imageUrl = urlData.publicUrl;
       }
 
-      // Create Razorpay order for ad payment
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/razorpay-order`, {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Please login again");
+
+      // Price server pe tay hoti hai; yahan se sirf choices jaati hain
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ad-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: budget, product_title: adTitle }),
+        body: JSON.stringify({
+          product_id: product.id,
+          ad_title: adTitle.trim(),
+          description: description.trim(),
+          image_url: imageUrl || null,
+          placement,
+          duration_days: durationDays,
+        }),
       });
-      const orderData = await res.json();
-      if (!res.ok) throw new Error(orderData.error || "Payment setup failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Payment setup failed");
 
-      await new Promise<void>((resolve, reject) => {
-        const options = {
-          key: orderData.key_id,
-          amount: orderData.order.amount,
-          currency: orderData.order.currency,
-          name: "MadFod Ads",
-          description: `Promote: ${adTitle}`,
-          order_id: orderData.order.id,
-          handler: () => resolve(),
-          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
-          theme: { color: "#0F3D2E" },
-        };
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-      });
-
-      const { error } = await supabase.from("ads").insert({
-        user_id: user.id,
-        product_id: product.id,
-        ad_title: adTitle.trim(),
-        description: description.trim() || null,
-        image_url: imageUrl || null,
-        placement,
-        duration_days: durationDays,
-        budget,
-        status: "active",
-        payment_status: "paid",
-        starts_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString(),
-      });
-
-      if (error) throw error;
-
-      toast.success("Ad is now LIVE! 🎉 It will appear on the homepage immediately.");
+      // Cashfree ka payment popup form dialog ke upar theek se kaam kare, isliye dialog pehle band karte hain
       onOpenChange(false);
-      resetForm();
+
+      const cashfree = (window as any).Cashfree({ mode: "production" });
+      const result = await cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_modal",
+      });
+
+      if (result?.error) throw new Error(result.error.message || "Payment cancelled");
+      if (result?.paymentDetails) {
+        toast.success("Payment received! 🎉 Your ad will go live once it is approved.");
+        resetForm();
+      } else if (result?.redirect) {
+        toast.info("Redirecting to payment...");
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to submit ad");
     } finally {
@@ -126,7 +119,6 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
     setDescription("");
     setPlacement("in-feed");
     setDurationDays(3);
-    setBudget(129);
     setBannerImage(null);
     setBannerPreview(null);
   };
@@ -210,14 +202,14 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
               </div>
             </div>
 
-            {/* Duration */}
+            {/* Duration (price placement ke hisaab se badalti hai) */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-2 block">Duration</label>
               <div className="grid grid-cols-3 gap-2">
                 {durations.map((d) => (
                   <button
                     key={d.days}
-                    onClick={() => handleDurationSelect(d)}
+                    onClick={() => setDurationDays(d.days)}
                     className={`px-3 py-2 rounded-xl border-2 text-center transition-all ${
                       durationDays === d.days
                         ? "border-secondary bg-secondary/5"
@@ -225,25 +217,10 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
                     }`}
                   >
                     <span className="text-sm font-medium text-foreground">{d.label}</span>
-                    <p className="text-[10px] text-secondary font-bold">₹{d.price}</p>
+                    <p className="text-[10px] text-secondary font-bold">₹{adPrices[placement][d.days]}</p>
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Custom Budget */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Budget (₹)</label>
-              <div className="relative">
-                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="number"
-                  value={budget}
-                  onChange={(e) => setBudget(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full bg-card border border-border/50 rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-                />
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-1">Higher budget = more visibility</p>
             </div>
 
             <button
@@ -285,8 +262,8 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
                 <span className="font-medium text-foreground">{selectedDuration?.label}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Budget</span>
-                <span className="font-bold text-secondary">₹{budget}</span>
+                <span className="text-muted-foreground">Amount to pay</span>
+                <span className="font-bold text-secondary">₹{price}</span>
               </div>
             </div>
 
@@ -303,10 +280,10 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
                 className="flex-1 py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
-                {submitting ? "Submitting..." : "Submit Ad"}
+                {submitting ? "Please wait..." : `Pay ₹${price}`}
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground text-center">Ad will be reviewed before going live. Payment will be collected upon approval.</p>
+            <p className="text-[10px] text-muted-foreground text-center">Your ad goes live after review. If it is not approved, the amount will be refunded.</p>
           </div>
         )}
       </DialogContent>
