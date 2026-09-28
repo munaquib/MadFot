@@ -28,10 +28,15 @@ const adPrices: Record<string, Record<number, number>> = {
   "in-feed": { 1: 49, 3: 129, 7: 249 },
 };
 
+// Product ka naam lamba ho sakta hai, lekin ad title ki limit 100 characters hai (server pe bhi yahi limit hai).
+// Default title ko 100 se chhota karte hain, aakhri adhoora shabd hata kar.
+const makeDefaultTitle = (t: string) =>
+  t.length <= 100 ? t : t.slice(0, 100).replace(/\s+\S*$/, "").trim();
+
 const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
   const { user } = useAuth();
   const [step, setStep] = useState<"form" | "preview">("form");
-  const [adTitle, setAdTitle] = useState(product.title);
+  const [adTitle, setAdTitle] = useState(makeDefaultTitle(product.title));
   const [description, setDescription] = useState("");
   const [placement, setPlacement] = useState("in-feed");
   const [durationDays, setDurationDays] = useState(3);
@@ -52,6 +57,7 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
   const handleSubmit = async () => {
     if (!user) return;
     if (!adTitle.trim()) { toast.error("Please enter an ad title"); return; }
+    if (adTitle.trim().length > 100) { toast.error("Ad title 100 characters se chhota rakho"); return; }
     setSubmitting(true);
 
     try {
@@ -115,7 +121,7 @@ const PromoteModal = ({ open, onOpenChange, product }: PromoteModalProps) => {
 
   const resetForm = () => {
     setStep("form");
-    setAdTitle(product.title);
+    setAdTitle(makeDefaultTitle(product.title));
     setDescription("");
     setPlacement("in-feed");
     setDurationDays(3);
