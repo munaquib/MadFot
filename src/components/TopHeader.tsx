@@ -5,12 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const marqueeItems = [
-  "🔥 Flat 80% Off on Bridal Lehengas",
+  "🔥 Up to 80% Off on Branded Ethnic Wear",
   "✨ New Arrivals: Designer Sherwani Collection",
-  "🎉 Free Shipping on Orders Above ₹2,000",
   "💎 Authenticity Guaranteed on Every Product",
   "👗 Sell Your Pre-Owned Fashion & Earn Cash",
-  "🛡️ Secure Payments with Razorpay",
+  "🛡️ Secure Payments via Cashfree",
   "⭐ Top Rated Sellers Near You",
 ];
 
