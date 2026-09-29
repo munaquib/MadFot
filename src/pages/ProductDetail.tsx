@@ -18,8 +18,9 @@ declare global {
   }
 }
 
-// Flat shipping charge (buyer product price ke upar deta hai). Server (cashfree-order) mein bhi yahi value hai.
-const SHIPPING_CHARGE = 100;
+// Delivery charge ab fixed nahi hai: buyer ke pincode ke hisaab se shipping-quote function Shiprocket se nikalta hai.
+// Agar quote service kabhi kaam na kare to server (cashfree-order) mein bhi yahi flat charge lagta hai.
+const FALLBACK_SHIPPING_CHARGE = 100;
 
 const ProductDetail = () => {
   const navigate = useNavigate();
@@ -50,8 +51,14 @@ const ProductDetail = () => {
   const [showPromote, setShowPromote] = useState(false);
 
   // Order summary popup — sirf coupon + total + Pay dikhata hai. Address address-gate
-  // se already confirm ho chuki hoti hai, isliye yahan dobara nahi maangi jaati.
+  // se already confirm ho chuka hota hai, isliye yahan dobara nahi maangi jaati.
   const [showOrderSummary, setShowOrderSummary] = useState(false);
+
+  // Delivery charge quote (buyer ke pincode ke hisaab se)
+  const [shipCharge, setShipCharge] = useState<number | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
+  const quoteReq = useRef(0);
 
   // Shared address gate — Buy Now aur Rent Now dono isi ek hook se
   // profile ka address collect/confirm karwate hain.
@@ -245,6 +252,49 @@ const ProductDetail = () => {
     });
   };
 
+  // Buyer ke pincode ke liye delivery charge nikalta hai (server par Shiprocket se, sabse sasta courier)
+  const fetchQuote = async () => {
+    if (!product || !gateAddress?.pincode) return;
+    const reqId = ++quoteReq.current;
+    setQuoteLoading(true);
+    setQuoteError("");
+    setShipCharge(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shipping-quote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify({ product_id: product.id, delivery_pincode: gateAddress.pincode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (reqId !== quoteReq.current) return;
+      if (data?.ok) {
+        setShipCharge(Number(data.shipping_charge));
+      } else if (data?.code === "unserviceable" || data?.code === "seller_not_ready" || data?.code === "bad_pincode") {
+        // Buyer ko payment se pehle hi rok do
+        setQuoteError(data.message || "Delivery is not available for this order.");
+      } else {
+        // Courier service kaam nahi kar rahi: checkout na ruke, flat charge lagao
+        setShipCharge(FALLBACK_SHIPPING_CHARGE);
+      }
+    } catch {
+      if (reqId === quoteReq.current) setShipCharge(FALLBACK_SHIPPING_CHARGE);
+    } finally {
+      if (reqId === quoteReq.current) setQuoteLoading(false);
+    }
+  };
+
+  // Order summary khulte hi (ya address/pincode badalte hi) charge dobara nikalo
+  useEffect(() => {
+    if (showOrderSummary && product?.id && gateAddress?.pincode) {
+      fetchQuote();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOrderSummary, product?.id, gateAddress?.pincode]);
+
   const handleApplyCoupon = async () => {
     if (!couponCode.trim() || !product) return;
     setApplyingCoupon(true);
@@ -308,6 +358,7 @@ const ProductDetail = () => {
   // Pay dabate hi gateAddress (profile se confirm hua address) use hota hai — koi naya form nahi.
   const handlePayNow = async () => {
     if (!product || !user) return;
+    if (shipCharge === null) { toast.error("Delivery charge is still loading. Please wait a moment."); return; }
     await trackAdClick();
     setPaying(true);
     try {
@@ -329,6 +380,7 @@ const ProductDetail = () => {
           delivery_state: gateAddress.state,
           delivery_pincode: gateAddress.pincode,
           coupon_code: appliedCoupon?.code || undefined,
+          quoted_shipping: shipCharge,
         }),
       });
       const data = await res.json();
@@ -347,7 +399,11 @@ const ProductDetail = () => {
         }
         else if (result.redirect) { toast.info("Redirecting to payment..."); }
       });
-    } catch (err: any) { toast.error(err.message || "Payment failed"); }
+    } catch (err: any) {
+      toast.error(err.message || "Payment failed");
+      // Charge badal gaya ho sakta hai, isliye naya charge dobara dikhao
+      fetchQuote();
+    }
     finally { setPaying(false); }
   };
 
@@ -535,7 +591,7 @@ const ProductDetail = () => {
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
   const isOwner = !!(user && product?.user_id === user.id);
   const couponDiscount = appliedCoupon?.discount || 0;
-  const totalPayable = (product?.price || 0) - couponDiscount + SHIPPING_CHARGE;
+  const totalPayable = (product?.price || 0) - couponDiscount + (shipCharge ?? 0);
 
   return (
     <AppLayout>
@@ -645,7 +701,7 @@ const ProductDetail = () => {
             <div className="flex items-center gap-2 mb-3 bg-emerald-50/50 rounded-xl px-3 py-2 border border-emerald-200/50">
               <Truck className="w-4 h-4 text-emerald-600" />
               <span className="text-xs font-semibold text-emerald-700">
-                Home Delivery by MadFod — ₹{SHIPPING_CHARGE}
+                Home Delivery by MadFod — delivery charge shown at checkout
               </span>
             </div>
           )}
@@ -912,20 +968,25 @@ const ProductDetail = () => {
               )}
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Delivery</span>
-                <span className="font-semibold">₹{SHIPPING_CHARGE}</span>
+                <span className="font-semibold">
+                  {quoteLoading ? "Calculating..." : shipCharge !== null ? `₹${shipCharge}` : "—"}
+                </span>
               </div>
               <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1 mt-1">
                 <span>Total</span>
-                <span className="text-secondary">₹{totalPayable.toLocaleString("en-IN")}</span>
+                <span className="text-secondary">
+                  {shipCharge !== null ? `₹${totalPayable.toLocaleString("en-IN")}` : "—"}
+                </span>
               </div>
             </div>
+            {quoteError && <p className="text-xs text-destructive">{quoteError}</p>}
 
             <button
               onClick={handlePayNow}
-              disabled={paying}
+              disabled={paying || quoteLoading || shipCharge === null}
               className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
             >
-              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : `Pay ₹${totalPayable.toLocaleString("en-IN")}`}
+              <CreditCard className="w-4 h-4" /> {paying ? "Processing..." : shipCharge !== null ? `Pay ₹${totalPayable.toLocaleString("en-IN")}` : "Pay"}
             </button>
             <p className="text-[10px] text-muted-foreground text-center">Courier isi address pe parcel deliver karega</p>
           </div>

@@ -516,7 +516,7 @@ const Sell = () => {
             <div className="glass-card rounded-xl p-3 border border-border/30 space-y-1">
               <p className="text-sm text-foreground">MadFod will deliver your parcel to the buyer by courier.</p>
               <p className="text-xs text-muted-foreground">
-                The buyer pays ₹{SHIPPING_CHARGE} for shipping. You pay nothing and there is no commission. The courier will pick up the parcel from your saved address.
+                The buyer pays the actual courier charge for their pincode. You pay nothing and there is no commission. The courier will pick up the parcel from your saved address.
               </p>
             </div>
           </div>

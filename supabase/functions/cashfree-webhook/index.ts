@@ -5,8 +5,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const COMMISSION_RATE = 0;
 
 const SHIPROCKET_BASE = "https://apiv2.shiprocket.in/v1/external";
-// Default parcel: 0.5 kg, 25x20x5 cm (kapde ke liye)
-const PARCEL = { weight: 0.5, length: 25, breadth: 20, height: 5 };
+
+// Category ke hisaab se parcel (shipping-quote aur cashfree-order mein bhi yahi table hai, teeno same rakhna)
+const DEFAULT_PARCEL = { weight: 0.5, length: 25, breadth: 20, height: 5 };
+const CATEGORY_PARCELS: Record<string, { weight: number; length: number; breadth: number; height: number }> = {
+  lehenga: { weight: 1.5, length: 30, breadth: 25, height: 10 },
+  sherwani: { weight: 1.5, length: 30, breadth: 25, height: 10 },
+  gown: { weight: 1.2, length: 30, breadth: 25, height: 8 },
+  suit: { weight: 1.0, length: 30, breadth: 25, height: 7 },
+  saree: { weight: 0.8, length: 30, breadth: 25, height: 5 },
+  "indo-western": { weight: 0.8, length: 30, breadth: 25, height: 5 },
+  kurti: { weight: 0.4, length: 25, breadth: 20, height: 4 },
+};
+const parcelFor = (category?: string | null) =>
+  CATEGORY_PARCELS[(category || "").trim().toLowerCase()] || DEFAULT_PARCEL;
 
 const last10Digits = (v: string | null | undefined) => (v || "").replace(/\D/g, "").slice(-10);
 
@@ -22,6 +34,40 @@ async function srCall(path: string, token: string | null, method: string, body?:
   });
   const json = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, json };
+}
+
+// Is route ke liye sabse sasta courier ka id (na mile ya koi error aaye to null, tab Shiprocket ka default courier chalega)
+async function pickCheapestCourierId(
+  token: string,
+  pickupPin: string,
+  deliveryPin: string,
+  weight: number
+): Promise<number | null> {
+  try {
+    const qs = new URLSearchParams({
+      pickup_postcode: String(pickupPin).trim(),
+      delivery_postcode: String(deliveryPin).trim(),
+      weight: String(weight),
+      cod: "0",
+    });
+    const sr = await srCall(`/courier/serviceability/?${qs.toString()}`, token, "GET");
+    const list: any[] = Array.isArray(sr.json?.data?.available_courier_companies)
+      ? sr.json.data.available_courier_companies
+      : [];
+    const best = list
+      .filter((c) => !c.blocked)
+      .map((c) => ({
+        id: Number(c.courier_company_id),
+        rate: Number(c.rate ?? c.freight_charge),
+        days: Number(c.estimated_delivery_days),
+      }))
+      .filter((c) => Number.isFinite(c.id) && Number.isFinite(c.rate) && c.rate > 0)
+      .sort((a, b) => a.rate - b.rate || (a.days || 99) - (b.days || 99))[0];
+    return best ? best.id : null;
+  } catch (err) {
+    console.error("pickCheapestCourierId error:", err);
+    return null;
+  }
 }
 
 // Payment ke baad Shiprocket mein shipment banata hai. Fail hone par order safe rehta hai,
@@ -53,6 +99,14 @@ async function createShipment(supabase: any, order: any, pending: any, cfOrderId
       await setStatus({ shiprocket_status: "login_failed", shiprocket_error: JSON.stringify(login.json).slice(0, 500) });
       return;
     }
+
+    // Product ki category se parcel ka weight/size (quote mein bhi yahi use hua tha)
+    const { data: prod } = await supabase
+      .from("products")
+      .select("category")
+      .eq("id", pending.product_id)
+      .maybeSingle();
+    const parcel = parcelFor(prod?.category);
 
     // 2. Seller ka pickup location (pehli baar hi register hota hai)
     const pickupName = `MF-${String(pending.seller_id).replace(/-/g, "").slice(0, 12)}`;
@@ -108,10 +162,10 @@ async function createShipment(supabase: any, order: any, pending: any, cfOrderId
       ],
       payment_method: "Prepaid",
       sub_total: itemAmount,
-      length: PARCEL.length,
-      breadth: PARCEL.breadth,
-      height: PARCEL.height,
-      weight: PARCEL.weight,
+      length: parcel.length,
+      breadth: parcel.breadth,
+      height: parcel.height,
+      weight: parcel.weight,
     });
 
     const shipmentId = created.json?.shipment_id;
@@ -128,8 +182,21 @@ async function createShipment(supabase: any, order: any, pending: any, cfOrderId
     });
 
     // 4. Courier + AWB assign (wallet mein balance chahiye)
-    const awb = await srCall("/courier/assign/awb", token, "POST", { shipment_id: shipmentId });
-    const awbData = awb.json?.response?.data;
+    // Pehle sabse sasta courier try karte hain. Wo assign na ho to Shiprocket ke default courier par wapas aate hain,
+    // taaki order kabhi sirf isliye na atke ki cheapest courier ne mana kar diya.
+    const courierId = await pickCheapestCourierId(token, seller.pickup_pincode, pending.delivery_pincode, parcel.weight);
+    let awb = await srCall(
+      "/courier/assign/awb",
+      token,
+      "POST",
+      courierId ? { shipment_id: shipmentId, courier_id: courierId } : { shipment_id: shipmentId }
+    );
+    let awbData = awb.json?.response?.data;
+    if ((!awb.ok || !awbData?.awb_code) && courierId) {
+      console.error("Cheapest courier assign failed, retrying with default courier:", JSON.stringify(awb.json).slice(0, 300));
+      awb = await srCall("/courier/assign/awb", token, "POST", { shipment_id: shipmentId });
+      awbData = awb.json?.response?.data;
+    }
     if (!awb.ok || !awbData?.awb_code) {
       await setStatus({ shiprocket_status: "awb_failed", shiprocket_error: JSON.stringify(awb.json).slice(0, 500) });
       return;

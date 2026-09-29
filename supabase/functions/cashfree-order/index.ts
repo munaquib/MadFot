@@ -6,8 +6,96 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Flat shipping charge jo buyer deta hai (product price ke upar)
-const SHIPPING_CHARGE = 100;
+// Shiprocket se rate na mil paye (service down ho) to ye flat charge lagega, taaki checkout na ruke
+const FALLBACK_SHIPPING_CHARGE = 100;
+
+const SHIPROCKET_BASE = "https://apiv2.shiprocket.in/v1/external";
+// Shiprocket rate upar ke itne rupaye tak round karke buyer se liya jaata hai
+const ROUND_UP_TO = 5;
+
+// Category ke hisaab se parcel (shipping-quote aur cashfree-webhook mein bhi yahi table hai, teeno same rakhna)
+const DEFAULT_PARCEL = { weight: 0.5, length: 25, breadth: 20, height: 5 };
+const CATEGORY_PARCELS: Record<string, { weight: number; length: number; breadth: number; height: number }> = {
+  lehenga: { weight: 1.5, length: 30, breadth: 25, height: 10 },
+  sherwani: { weight: 1.5, length: 30, breadth: 25, height: 10 },
+  gown: { weight: 1.2, length: 30, breadth: 25, height: 8 },
+  suit: { weight: 1.0, length: 30, breadth: 25, height: 7 },
+  saree: { weight: 0.8, length: 30, breadth: 25, height: 5 },
+  "indo-western": { weight: 0.8, length: 30, breadth: 25, height: 5 },
+  kurti: { weight: 0.4, length: 25, breadth: 20, height: 4 },
+};
+const parcelFor = (category?: string | null) =>
+  CATEGORY_PARCELS[(category || "").trim().toLowerCase()] || DEFAULT_PARCEL;
+
+async function srCall(path: string, token: string | null, method: string, body?: unknown) {
+  const res = await fetch(`${SHIPROCKET_BASE}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "MadFod/1.0",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, json: data };
+}
+
+let cachedToken: { token: string; expiresAt: number } | null = null;
+async function getToken(): Promise<string | null> {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token;
+  const login = await srCall("/auth/login", null, "POST", {
+    email: Deno.env.get("SHIPROCKET_EMAIL"),
+    password: Deno.env.get("SHIPROCKET_PASSWORD"),
+  });
+  const token = login.json?.token;
+  if (!login.ok || !token) return null;
+  cachedToken = { token, expiresAt: Date.now() + 6 * 60 * 60 * 1000 };
+  return token;
+}
+
+type Quote = { status: "ok"; charge: number } | { status: "unserviceable" } | { status: "error" };
+
+// Seller ke pincode se buyer ke pincode tak sabse sasta courier ka rate (₹5 tak round-up)
+async function getShippingQuote(pickupPin: string, deliveryPin: string, category?: string | null): Promise<Quote> {
+  try {
+    let token = await getToken();
+    if (!token) return { status: "error" };
+
+    const parcel = parcelFor(category);
+    const qs = new URLSearchParams({
+      pickup_postcode: pickupPin,
+      delivery_postcode: deliveryPin,
+      weight: String(parcel.weight),
+      cod: "0",
+    });
+    let sr = await srCall(`/courier/serviceability/?${qs.toString()}`, token, "GET");
+    if (sr.status === 401) {
+      cachedToken = null;
+      token = await getToken();
+      if (token) sr = await srCall(`/courier/serviceability/?${qs.toString()}`, token, "GET");
+    }
+
+    const list: any[] = Array.isArray(sr.json?.data?.available_courier_companies)
+      ? sr.json.data.available_courier_companies
+      : [];
+    const candidates = list
+      .filter((c) => !c.blocked)
+      .map((c) => ({ rate: Number(c.rate ?? c.freight_charge), days: Number(c.estimated_delivery_days) }))
+      .filter((c) => Number.isFinite(c.rate) && c.rate > 0)
+      .sort((a, b) => a.rate - b.rate || (a.days || 99) - (b.days || 99));
+
+    if (candidates.length === 0) {
+      const msg = String(sr.json?.message || "");
+      const unserviceable = (sr.ok && list.length === 0) || /serviceab|no courier|not available/i.test(msg);
+      return { status: unserviceable ? "unserviceable" : "error" };
+    }
+    return { status: "ok", charge: Math.ceil(candidates[0].rate / ROUND_UP_TO) * ROUND_UP_TO };
+  } catch (err) {
+    console.error("getShippingQuote error:", err);
+    return { status: "error" };
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,7 +106,7 @@ serve(async (req) => {
     const {
       product_id, buyer_id, buyer_email, buyer_name, buyer_phone,
       delivery_address, delivery_city, delivery_state, delivery_pincode,
-      coupon_code,
+      coupon_code, quoted_shipping,
     } = await req.json();
 
     if (!product_id || !buyer_id) {
@@ -38,7 +126,7 @@ serve(async (req) => {
     // Price browser se nahi, database se padhte hain (taaki koi amount change na kar sake)
     const { data: product, error: productErr } = await supabase
       .from("products")
-      .select("id, title, price, user_id, status")
+      .select("id, title, price, user_id, status, category")
       .eq("id", product_id)
       .single();
 
@@ -50,6 +138,34 @@ serve(async (req) => {
     }
     if (product.user_id === buyer_id) {
       throw new Error("Aap apna hi product nahi khareed sakte");
+    }
+
+    // Delivery charge bhi browser se nahi, server par Shiprocket se nikalte hain
+    const { data: sellerProfile } = await supabase
+      .from("profiles")
+      .select("pickup_pincode")
+      .eq("user_id", product.user_id)
+      .maybeSingle();
+    const pickupPin = String(sellerProfile?.pickup_pincode || "").trim();
+    if (!/^\d{6}$/.test(pickupPin)) {
+      throw new Error("This seller has not set up shipping yet. Please chat with the seller or try again later.");
+    }
+
+    const quote = await getShippingQuote(pickupPin, String(delivery_pincode).trim(), product.category);
+    let shippingCharge: number;
+    if (quote.status === "ok") {
+      shippingCharge = quote.charge;
+    } else if (quote.status === "unserviceable") {
+      throw new Error("Delivery is not available to this pincode right now.");
+    } else {
+      console.error("Shiprocket quote failed, using fallback charge for product", product_id);
+      shippingCharge = FALLBACK_SHIPPING_CHARGE;
+    }
+
+    // Buyer ko jo charge dikha tha wo abhi ke charge se kam ho gaya ho to naya charge dobara dikhao
+    const shown = Number(quoted_shipping);
+    if (Number.isFinite(shown) && shown > 0 && shippingCharge > shown) {
+      throw new Error(`The delivery charge changed to ₹${shippingCharge}. Please review your order and try again.`);
     }
 
     const itemPrice = Number(product.price);
@@ -93,7 +209,7 @@ serve(async (req) => {
       appliedCouponCode = coupon.code;
     }
 
-    const totalAmount = itemPrice - discountAmount + SHIPPING_CHARGE;
+    const totalAmount = itemPrice - discountAmount + shippingCharge;
     const seller_id = product.user_id;
 
     const orderId = `MF_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -140,7 +256,7 @@ serve(async (req) => {
         buyer_id,
         seller_id,
         amount: totalAmount,
-        shipping_charge: SHIPPING_CHARGE,
+        shipping_charge: shippingCharge,
         coupon_code: appliedCouponCode,
         discount_amount: discountAmount,
         product_title: product.title || "MadFod Purchase",
@@ -173,6 +289,7 @@ serve(async (req) => {
         payment_session_id: data.payment_session_id,
         order_amount: data.order_amount,
         discount_amount: discountAmount,
+        shipping_charge: shippingCharge,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
