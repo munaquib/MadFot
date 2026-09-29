@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Camera, Image, ChevronDown, X, Loader2, Truck, Phone } from "lucide-react";
+import { Camera, Image, ChevronDown, X, Loader2, Truck, MapPin, Pencil, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
@@ -7,9 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import LocationPicker from "@/components/LocationPicker";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import AddressGateDialog from "@/components/AddressGateDialog";
-import { useAddressGate } from "@/hooks/useAddressGate";
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 
@@ -113,6 +110,37 @@ const prepareImageForUpload = async (file: File): Promise<File> => {
 const sizes = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
 const conditions = ["New with Tags", "Like New", "Good", "Fair"];
 
+// ---- Pickup address helpers ----
+type PickupAddr = {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
+const EMPTY_ADDR: PickupAddr = { name: "", phone: "", address: "", city: "", state: "", pincode: "" };
+
+// Phone se sirf digits rakho; +91 / 91 prefix ho toh hata do
+const cleanPhone = (p: string) => {
+  let d = (p || "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  return d;
+};
+
+// Kaunsi field abhi galat/khali hai — button ke neeche hint dikhane ke liye
+const addrProblems = (a: PickupAddr): string[] => {
+  const out: string[] = [];
+  if (!a.name.trim()) out.push("name");
+  if (cleanPhone(a.phone).length !== 10) out.push("10-digit phone");
+  if (a.address.trim().length < 8) out.push("full address");
+  if (!a.city.trim()) out.push("city");
+  if (!a.state.trim()) out.push("state");
+  if (!/^\d{6}$/.test(a.pincode.trim())) out.push("6-digit pincode");
+  return out;
+};
+
 const Sell = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -140,27 +168,46 @@ const Sell = () => {
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [oldPrice, setOldPrice] = useState<number | null>(null);
 
-  const [myPhone, setMyPhone] = useState<string | null>(null);
-  const [showPhoneDialog, setShowPhoneDialog] = useState(false);
-  const [phoneInput, setPhoneInput] = useState("");
-
-  // Shared address gate — Buy Now / Sell Now / Rent Now teeno isi ek hook se
-  // profile ka pickup/delivery address collect ya confirm karwate hain.
-  const { gateOpen, setGateOpen, gateMode, gateAddress, gateSaving, requestAddress, saveAddress, confirmAddress } =
-    useAddressGate(user?.id);
+  // Pickup address (profile se load hota hai, yahin inline edit hota hai)
+  const [addr, setAddr] = useState<PickupAddr>(EMPTY_ADDR);
+  const [profilePhone, setProfilePhone] = useState<string | null>(null);
+  const [addrLoaded, setAddrLoaded] = useState(false);
+  // "form" = seller address bhar/edit kar raha hai, "confirm" = saved address dikha kar poochho sahi hai na
+  const [addrMode, setAddrMode] = useState<"form" | "confirm">("form");
+  const [addrConfirmed, setAddrConfirmed] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("phone")
+      .select("phone, full_name, pickup_name, pickup_phone, pickup_address, pickup_city, pickup_state, pickup_pincode")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
-        if (!data) return;
-        setMyPhone((data as any).phone || null);
+        if (data) {
+          const d = data as any;
+          setProfilePhone(d.phone || null);
+          const loaded: PickupAddr = {
+            name: d.pickup_name || d.full_name || "",
+            phone: d.pickup_phone || d.phone || "",
+            address: d.pickup_address || "",
+            city: d.pickup_city || "",
+            state: d.pickup_state || "",
+            pincode: d.pickup_pincode || "",
+          };
+          setAddr(loaded);
+          // Pehle se poora address saved hai to seller ko sirf confirm karwao
+          if (d.pickup_address && addrProblems(loaded).length === 0) {
+            setAddrMode("confirm");
+          }
+        }
+        setAddrLoaded(true);
       });
   }, [user]);
+
+  const setAddrField = (key: keyof PickupAddr, value: string) => {
+    setAddr((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -180,45 +227,59 @@ const Sell = () => {
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const finalCategoryValue = category === "Other" ? customCategory.trim() : category;
+
+  // Post button ke liye: kya-kya abhi baaki hai
+  const missing: string[] = [];
+  if (!title.trim()) missing.push("title");
+  if (!price) missing.push("price");
+  if (!finalCategoryValue) missing.push("category");
+  if (images.length === 0) missing.push("photo");
+  if (!addrLoaded) missing.push("address is loading");
+  else if (addrMode === "confirm" && !addrConfirmed) missing.push("confirm your address");
+  else if (addrMode === "form") {
+    const p = addrProblems(addr);
+    if (p.length > 0) missing.push("pickup address (" + p.join(", ") + ")");
+  }
+  const canPost = missing.length === 0 && !submitting;
+
   const handleSubmit = async () => {
-    if (!user) return;
-    const finalCategory = category === "Other" ? customCategory.trim() : category;
-    if (!title || !price || !finalCategory) {
-      toast.error("Please fill in Title, Price, and Category");
-      return;
-    }
-    if (images.length === 0) {
-      toast.error("Please add at least one photo");
-      return;
-    }
-    if (!myPhone) {
-      setPhoneInput("");
-      setShowPhoneDialog(true);
-      return;
-    }
+    if (!user || !canPost) return;
+    const cleanedPhone = cleanPhone(addr.phone);
 
-    // Address confirm/collect hone ke baad hi listing post hogi
-    requestAddress(() => proceedSubmit());
-  };
+    setSubmitting(true);
+    try {
+      // 1. Address profile mein save karo (agli baar seller ko wahi dikhega)
+      const profileUpdate: Record<string, any> = {
+        pickup_name: addr.name.trim(),
+        pickup_phone: cleanedPhone,
+        pickup_address: addr.address.trim(),
+        pickup_city: addr.city.trim(),
+        pickup_state: addr.state.trim(),
+        pickup_pincode: addr.pincode.trim(),
+      };
+      // Buyers seller ko call kar sakein, isliye profile ka phone khali ho to yahi number bhar do
+      if (!profilePhone) profileUpdate.phone = cleanedPhone;
 
-  const handleSavePhoneAndContinue = async () => {
-    if (!user) return;
-    const trimmed = phoneInput.trim();
-    if (!trimmed || trimmed.length < 10) {
-      toast.error("Please enter a valid phone number");
-      return;
+      const { error: addrError } = await supabase
+        .from("profiles")
+        .update(profileUpdate as any)
+        .eq("user_id", user.id);
+      if (addrError) {
+        toast.error("Could not save address. Please try again.");
+        return;
+      }
+      if (!profilePhone) setProfilePhone(cleanedPhone);
+
+      // 2. Ab listing post karo
+      await proceedSubmit();
+    } finally {
+      setSubmitting(false);
     }
-    const { error } = await supabase.from("profiles").update({ phone: trimmed } as any).eq("user_id", user.id);
-    if (error) { toast.error("Failed to save number"); return; }
-    setMyPhone(trimmed);
-    setShowPhoneDialog(false);
-    toast.success("Number saved! 📞");
-    requestAddress(() => proceedSubmit());
   };
 
   const proceedSubmit = async () => {
     if (!user) return;
-    setSubmitting(true);
     try {
       const uploadedUrls: string[] = [];
       for (const file of images) {
@@ -284,8 +345,6 @@ const Sell = () => {
       navigate("/profile");
     } catch (err: any) {
       toast.error(err.message || "Failed to list product");
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -365,7 +424,7 @@ const Sell = () => {
                 type="text"
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
-                placeholder="Apni category type karo (e.g. Jacket, Waistcoat)"
+                placeholder="Type your category (e.g. Jacket, Waistcoat)"
                 className="mt-2 w-full glass-card border border-border/50 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary/30"
               />
             )}
@@ -406,11 +465,90 @@ const Sell = () => {
               <Truck className="w-4 h-4" /> Delivery
             </label>
             <div className="glass-card rounded-xl p-3 border border-border/30 space-y-1">
-              <p className="text-sm text-foreground">MadFod aapka parcel courier se buyer tak pahunchayega.</p>
+              <p className="text-sm text-foreground">MadFod will deliver your parcel to the buyer by courier.</p>
               <p className="text-xs text-muted-foreground">
-                Buyer ₹{SHIPPING_CHARGE} shipping deta hai. Aapko kuch nahi dena, aur koi commission bhi nahi. Courier aapke saved address se parcel le jayega.
+                The buyer pays ₹{SHIPPING_CHARGE} for shipping. You pay nothing and there is no commission. The courier will pick up the parcel from your saved address.
               </p>
             </div>
+          </div>
+
+          {/* Pickup address — sell, rent aur sell+rent teeno listing types ke liye */}
+          <div className="md:col-span-2">
+            <label className="text-xs font-semibold text-foreground mb-2 block flex items-center gap-2">
+              <MapPin className="w-4 h-4" /> Pickup Address
+            </label>
+
+            {!addrLoaded ? (
+              <div className="glass-card rounded-xl p-4 border border-border/30 flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading your saved address...
+              </div>
+            ) : addrMode === "confirm" ? (
+              <div className={`glass-card rounded-xl p-3 border space-y-3 ${addrConfirmed ? "border-secondary/50" : "border-border/30"}`}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-foreground">{addr.name}</p>
+                  <p className="text-xs text-foreground">{addr.address}</p>
+                  <p className="text-xs text-foreground">{addr.city}, {addr.state} - {addr.pincode}</p>
+                  <p className="text-xs text-muted-foreground">Phone: {cleanPhone(addr.phone)}</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">The courier will pick up the parcel from this address. Is it correct?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddrConfirmed(true)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${addrConfirmed ? "bg-secondary/10 text-secondary border-2 border-secondary" : "bg-primary text-secondary hover:opacity-90"}`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> {addrConfirmed ? "Confirmed" : "Yes, this is correct"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddrMode("form"); setAddrConfirmed(false); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border-2 border-border/40 text-foreground flex items-center justify-center gap-1.5 hover:bg-muted/40 transition-all"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card rounded-xl p-3 border border-border/30 space-y-3">
+                <p className="text-[10px] text-muted-foreground">
+                  This address is saved once. Next time you list something, you only need to confirm it.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Name</label>
+                    <input type="text" value={addr.name} onChange={(e) => setAddrField("name", e.target.value)}
+                      placeholder="Full name" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Phone</label>
+                    <input type="tel" inputMode="numeric" value={addr.phone} onChange={(e) => setAddrField("phone", e.target.value)}
+                      placeholder="10-digit number" className={inputClass} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-muted-foreground mb-1 block">Address</label>
+                    <textarea rows={2} value={addr.address} onChange={(e) => setAddrField("address", e.target.value)}
+                      placeholder="House/flat no., street, area, landmark"
+                      className={inputClass + " resize-none"} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">City</label>
+                    <input type="text" value={addr.city} onChange={(e) => setAddrField("city", e.target.value)}
+                      placeholder="e.g. Meerut" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">State</label>
+                    <input type="text" value={addr.state} onChange={(e) => setAddrField("state", e.target.value)}
+                      placeholder="e.g. Uttar Pradesh" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Pincode</label>
+                    <input type="text" inputMode="numeric" maxLength={6} value={addr.pincode}
+                      onChange={(e) => setAddrField("pincode", e.target.value.replace(/\D/g, ""))}
+                      placeholder="6-digit pincode" className={inputClass} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -472,58 +610,21 @@ const Sell = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full py-3.5 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card hover:opacity-90 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : "👗 Post Ad — Sell Now"}
-        </button>
-      </div>
-
-      {/* Phone number dialog */}
-      <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
-        <DialogContent className="max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-lg flex items-center gap-2">
-              <Phone className="w-5 h-5 text-secondary" /> Add Your Phone Number
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <p className="text-xs text-muted-foreground">
-              Buyers aapko call kar sakein, iske liye apna phone number add karo. Ye sirf interested buyers ko dikhega.
+        <div className="space-y-2">
+          <button
+            onClick={handleSubmit}
+            disabled={!canPost}
+            className="w-full py-3.5 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card hover:opacity-90 transition-all duration-200 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none disabled:hover:opacity-100 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : "👗 Post Ad — Sell Now"}
+          </button>
+          {!canPost && !submitting && (
+            <p className="text-[11px] text-center text-muted-foreground">
+              Still needed: {missing.join(" • ")}
             </p>
-            <input
-              type="tel"
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSavePhoneAndContinue()}
-              placeholder="+91 XXXXX XXXXX"
-              className={inputClass}
-            />
-            <button
-              onClick={handleSavePhoneAndContinue}
-              disabled={!phoneInput.trim() || submitting}
-              className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
-            >
-              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Posting...</> : <><Phone className="w-4 h-4" /> Save & Continue</>}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Shared address gate — collect/confirm, teeno flows (buy/sell/rent) isi se chalte hain */}
-      <AddressGateDialog
-        open={gateOpen}
-        onOpenChange={setGateOpen}
-        mode={gateMode}
-        address={gateAddress}
-        saving={gateSaving}
-        title="Pickup Address"
-        helperText="Order aane par courier is address se parcel uthayega."
-        onSave={saveAddress}
-        onConfirm={confirmAddress}
-      />
+          )}
+        </div>
+      </div>
     </AppLayout>
   );
 };
