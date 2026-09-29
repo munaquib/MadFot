@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import PromoteModal from "@/components/PromoteModal";
 import SellerReviews from "@/components/SellerReviews";
+import AddressGateDialog from "@/components/AddressGateDialog";
+import { useAddressGate } from "@/hooks/useAddressGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -36,7 +38,6 @@ const ProductDetail = () => {
   const [existingOrderStatus, setExistingOrderStatus] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [purchaseChecked, setPurchaseChecked] = useState(false);
-  const [buyerPhone, setBuyerPhone] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [showOfferDialog, setShowOfferDialog] = useState(false);
@@ -47,13 +48,15 @@ const ProductDetail = () => {
   const [rentDays, setRentDays] = useState(0);
   const [rentTotal, setRentTotal] = useState(0);
   const [showPromote, setShowPromote] = useState(false);
-  const [showAddressDialog, setShowAddressDialog] = useState(false);
-  const [addressName, setAddressName] = useState("");
-  const [addressPhone, setAddressPhone] = useState("");
-  const [addressLine, setAddressLine] = useState("");
-  const [addressCity, setAddressCity] = useState("");
-  const [addressState, setAddressState] = useState("");
-  const [addressPincode, setAddressPincode] = useState("");
+
+  // Order summary popup — sirf coupon + total + Pay dikhata hai. Address address-gate
+  // se already confirm ho chuki hoti hai, isliye yahan dobara nahi maangi jaati.
+  const [showOrderSummary, setShowOrderSummary] = useState(false);
+
+  // Shared address gate — Buy Now aur Rent Now dono isi ek hook se
+  // profile ka address collect/confirm karwate hain.
+  const { gateOpen, setGateOpen, gateMode, gateAddress, gateSaving, requestAddress, saveAddress, confirmAddress } =
+    useAddressGate(user?.id);
 
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
@@ -140,13 +143,6 @@ const ProductDetail = () => {
 
             setHasPurchased(purchased);
             setPurchaseChecked(true);
-
-            const { data: buyerProf } = await supabase
-              .from("profiles")
-              .select("phone")
-              .eq("user_id", user.id)
-              .maybeSingle();
-            if ((buyerProf as any)?.phone) setBuyerPhone((buyerProf as any).phone);
           } else {
             setPurchaseChecked(true);
           }
@@ -237,20 +233,16 @@ const ProductDetail = () => {
     }
   };
 
+  // Buy Now dabate hi pehle address gate (collect ya confirm), uske baad hi order summary khulta hai.
   const handleBuyNow = () => {
     if (!product) return;
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
-    if (!buyerPhone) {
-      toast.error("Please add your phone number in Profile before buying");
-      navigate("/profile");
-      return;
-    }
-    setAddressName(user.user_metadata?.full_name || "");
-    setAddressPhone(buyerPhone);
-    setCouponCode("");
-    setAppliedCoupon(null);
-    setCouponError("");
-    setShowAddressDialog(true);
+    requestAddress(() => {
+      setCouponCode("");
+      setAppliedCoupon(null);
+      setCouponError("");
+      setShowOrderSummary(true);
+    });
   };
 
   const handleApplyCoupon = async () => {
@@ -313,16 +305,9 @@ const ProductDetail = () => {
     setCouponError("");
   };
 
-  const handleConfirmAddressAndPay = async () => {
+  // Pay dabate hi gateAddress (profile se confirm hua address) use hota hai — koi naya form nahi.
+  const handlePayNow = async () => {
     if (!product || !user) return;
-    if (!addressName.trim() || !addressPhone.trim() || !addressLine.trim() || !addressCity.trim() || !addressState.trim() || !addressPincode.trim()) {
-      toast.error("Please fill all delivery details");
-      return;
-    }
-    if (!/^\d{6}$/.test(addressPincode.trim())) {
-      toast.error("Please enter a valid 6-digit pincode");
-      return;
-    }
     await trackAdClick();
     setPaying(true);
     try {
@@ -337,18 +322,18 @@ const ProductDetail = () => {
           product_id: product.id,
           buyer_id: user.id,
           buyer_email: user.email || "customer@madfod.com",
-          buyer_name: addressName.trim(),
-          buyer_phone: addressPhone.trim(),
-          delivery_address: addressLine.trim(),
-          delivery_city: addressCity.trim(),
-          delivery_state: addressState.trim(),
-          delivery_pincode: addressPincode.trim(),
+          buyer_name: gateAddress.name,
+          buyer_phone: gateAddress.phone,
+          delivery_address: gateAddress.address,
+          delivery_city: gateAddress.city,
+          delivery_state: gateAddress.state,
+          delivery_pincode: gateAddress.pincode,
           coupon_code: appliedCoupon?.code || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create order");
-      setShowAddressDialog(false);
+      setShowOrderSummary(false);
       const cashfree = window.Cashfree({ mode: "production" });
       cashfree.checkout({
         paymentSessionId: data.payment_session_id,
@@ -504,6 +489,12 @@ const ProductDetail = () => {
     setRentTotal(total);
   };
 
+  // Rent Now button pehle address gate se confirm karwata hai, tabhi date-picker box khulta hai.
+  const openRentDialog = () => {
+    if (!user) { toast.error("Please login first"); navigate("/login"); return; }
+    requestAddress(() => setShowRentDialog(true));
+  };
+
   const handleRentNow = async () => {
     if (!user) { toast.error("Please login first"); navigate("/login"); return; }
     if (!rentStartDate || !rentEndDate || rentDays < 1) { toast.error("Please select valid rental dates"); return; }
@@ -523,6 +514,12 @@ const ProductDetail = () => {
         rental_days: rentDays,
         deposit_amount: product.rent_deposit || 0,
         status: "processing",
+        buyer_name: gateAddress.name || null,
+        buyer_phone: gateAddress.phone || null,
+        delivery_address: gateAddress.address || null,
+        delivery_city: gateAddress.city || null,
+        delivery_state: gateAddress.state || null,
+        delivery_pincode: gateAddress.pincode || null,
       } as any);
       if (error) throw error;
       toast.success("Rental booked successfully! 🎉");
@@ -755,7 +752,7 @@ const ProductDetail = () => {
                 </button>
               )}
               {(product?.listing_type === "rent" || product?.listing_type === "both") && product?.rent_price_per_day && (
-                <button onClick={() => setShowRentDialog(true)}
+                <button onClick={openRentDialog}
                   className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-card hover:opacity-90 transition-all duration-200 mt-2">
                   🔄 Rent Now — ₹{product.rent_price_per_day}/day
                 </button>
@@ -852,75 +849,23 @@ const ProductDetail = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+      {/* Order summary — address gate se confirm hua address yahan header mein dikhta hai, dobara type nahi karna padta */}
+      <Dialog open={showOrderSummary} onOpenChange={setShowOrderSummary}>
         <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-serif text-lg">Delivery Address</DialogTitle>
+            <DialogTitle className="font-serif text-lg">Order Summary</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Full Name</label>
-              <input
-                type="text"
-                value={addressName}
-                onChange={(e) => setAddressName(e.target.value)}
-                placeholder="Your name"
-                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone Number</label>
-              <input
-                type="tel"
-                value={addressPhone}
-                onChange={(e) => setAddressPhone(e.target.value)}
-                placeholder="10-digit mobile number"
-                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Address (House no, Street, Area)</label>
-              <textarea
-                value={addressLine}
-                onChange={(e) => setAddressLine(e.target.value)}
-                placeholder="Full delivery address"
-                rows={3}
-                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50 resize-none"
-              />
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">City</label>
-                <input
-                  type="text"
-                  value={addressCity}
-                  onChange={(e) => setAddressCity(e.target.value)}
-                  placeholder="City"
-                  className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">State</label>
-                <input
-                  type="text"
-                  value={addressState}
-                  onChange={(e) => setAddressState(e.target.value)}
-                  placeholder="State"
-                  className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Pincode</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={addressPincode}
-                onChange={(e) => setAddressPincode(e.target.value.replace(/\D/g, ""))}
-                placeholder="6-digit pincode"
-                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50"
-              />
+            <div className="glass-card rounded-xl p-3 border border-border/30 space-y-0.5 text-sm">
+              <p className="font-semibold text-foreground">Delivering to: {gateAddress.name}</p>
+              <p className="text-muted-foreground text-xs">{gateAddress.address}, {gateAddress.city}, {gateAddress.state} - {gateAddress.pincode}</p>
+              <p className="text-muted-foreground text-xs">{gateAddress.phone}</p>
+              <button
+                onClick={() => requestAddress(() => setShowOrderSummary(true))}
+                className="text-[11px] font-semibold text-secondary underline underline-offset-2 mt-1"
+              >
+                Change address
+              </button>
             </div>
 
             {/* Coupon */}
@@ -976,7 +921,7 @@ const ProductDetail = () => {
             </div>
 
             <button
-              onClick={handleConfirmAddressAndPay}
+              onClick={handlePayNow}
               disabled={paying}
               className="w-full py-3 bg-primary text-secondary rounded-xl font-bold text-sm shadow-card flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-all duration-200"
             >
@@ -986,6 +931,19 @@ const ProductDetail = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Shared address gate — Buy Now aur Rent Now dono isi se address collect/confirm karwate hain */}
+      <AddressGateDialog
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        mode={gateMode}
+        address={gateAddress}
+        saving={gateSaving}
+        title="Delivery Address"
+        helperText="Courier isi address pe parcel deliver karega."
+        onSave={saveAddress}
+        onConfirm={confirmAddress}
+      />
 
       <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
         <DialogContent className="max-w-sm mx-auto">
