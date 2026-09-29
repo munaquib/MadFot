@@ -175,6 +175,11 @@ const Sell = () => {
   // "form" = seller address bhar/edit kar raha hai, "confirm" = saved address dikha kar poochho sahi hai na
   const [addrMode, setAddrMode] = useState<"form" | "confirm">("form");
   const [addrConfirmed, setAddrConfirmed] = useState(false);
+  const [pinLooking, setPinLooking] = useState(false);
+  // Jis pincode ka lookup ho chuka (ya jo already saved hai), uska dobara lookup nahi hoga
+  const lookedPin = useRef("");
+  // Seller ne Location khud type/detect ki ho to auto-fill usse overwrite nahi karega
+  const locationEdited = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -198,12 +203,56 @@ const Sell = () => {
           setAddr(loaded);
           // Pehle se poora address saved hai to seller ko sirf confirm karwao
           if (d.pickup_address && addrProblems(loaded).length === 0) {
+            lookedPin.current = loaded.pincode.trim();
             setAddrMode("confirm");
           }
         }
         setAddrLoaded(true);
       });
   }, [user]);
+
+  // Pincode ke 6 digit poore hote hi city + state apne aap bhar do (India Post ki free service)
+  useEffect(() => {
+    const pin = addr.pincode.trim();
+    if (addrMode !== "form" || !/^\d{6}$/.test(pin) || pin === lookedPin.current) return;
+    lookedPin.current = pin;
+    let cancelled = false;
+    setPinLooking(true);
+    fetch(`https://api.postalpincode.in/pincode/${pin}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const po = data?.[0]?.PostOffice?.[0];
+        if (data?.[0]?.Status === "Success" && po) {
+          setAddr((prev) =>
+            prev.pincode.trim() === pin
+              ? { ...prev, city: po.District || prev.city, state: po.State || prev.state }
+              : prev
+          );
+        } else {
+          lookedPin.current = "";
+          toast.error("Pincode not found. Please check it, or enter city and state manually.");
+        }
+      })
+      .catch(() => {
+        // Service down ho to seller city/state khud likh sakta hai
+        lookedPin.current = "";
+      })
+      .finally(() => {
+        if (!cancelled) setPinLooking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [addr.pincode, addrMode]);
+
+  // Location khali ho aur seller ne khud kuch na likha ho to pickup city se bhar do
+  useEffect(() => {
+    const city = addr.city.trim();
+    if (!city || location.trim() || locationEdited.current) return;
+    const st = addr.state.trim();
+    setLocation(st && st !== city ? `${city}, ${st}` : city);
+  }, [addr.city, addr.state, location]);
 
   const setAddrField = (key: keyof PickupAddr, value: string) => {
     setAddr((prev) => ({ ...prev, [key]: value }));
@@ -455,8 +504,8 @@ const Sell = () => {
             <label className="text-xs font-semibold text-foreground mb-1 block">Location</label>
             <LocationPicker
               value={location}
-              onChange={(loc, lt, ln) => { setLocation(loc); setLat(lt); setLng(ln); }}
-              placeholder="Your city (tap 📍 to detect)"
+              onChange={(loc, lt, ln) => { locationEdited.current = true; setLocation(loc); setLat(lt); setLng(ln); }}
+              placeholder="Your city (tap the arrow to detect)"
             />
           </div>
 
@@ -545,6 +594,7 @@ const Sell = () => {
                     <input type="text" inputMode="numeric" maxLength={6} value={addr.pincode}
                       onChange={(e) => setAddrField("pincode", e.target.value.replace(/\D/g, ""))}
                       placeholder="6-digit pincode" className={inputClass} />
+                    {pinLooking && <p className="text-[10px] text-muted-foreground mt-1">Finding city and state...</p>}
                   </div>
                 </div>
               </div>
