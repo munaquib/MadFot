@@ -142,8 +142,12 @@ async function createShipment(supabase: any, order: any, pending: any, cfOrderId
     });
 
     // 5. Pickup schedule karo
+    // Kabhi-kabhi Shiprocket AWB assign hote hi khud pickup queue mein daal deta hai.
+    // Tab /courier/generate/pickup "Already in Pickup Queue" bolta hai — ye fail nahi,
+    // balki confirmation hai ki pickup pehle se ban chuka hai, isliye ise bhi success maano.
     const pickup = await srCall("/courier/generate/pickup", token, "POST", { shipment_id: [shipmentId] });
-    if (pickup.ok) {
+    const alreadyQueued = /already in pickup queue/i.test(JSON.stringify(pickup.json));
+    if (pickup.ok || alreadyQueued) {
       await setStatus({ shiprocket_status: "pickup_scheduled", shiprocket_error: null });
     } else {
       await setStatus({ shiprocket_status: "pickup_failed", shiprocket_error: JSON.stringify(pickup.json).slice(0, 500) });
