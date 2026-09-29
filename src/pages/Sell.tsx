@@ -10,8 +10,6 @@ import LocationPicker from "@/components/LocationPicker";
 
 const categories = ["Lehenga", "Sherwani", "Saree", "Suit", "Kurti", "Gown", "Indo-Western", "Other"];
 
-const SHIPPING_CHARGE = 100;
-
 // iPhone/iPad camera se aayi photos HEIC/HEIF format mein hoti hain, jise browsers
 // (Chrome, Firefox, Android) directly nahi dikha sakte. Isliye upload se pehle
 // aise files ko JPEG mein convert karte hain. Library sirf tabhi load hoti hai
@@ -364,7 +362,6 @@ const Sell = () => {
         latitude: lat || null,
         longitude: lng || null,
         delivery_available: true,
-        delivery_charge: SHIPPING_CHARGE,
         listing_type: listingType,
         rent_price_per_day: (listingType === "rent" || listingType === "both") && rentPricePerDay ? parseFloat(rentPricePerDay) : null,
         rent_deposit: (listingType === "rent" || listingType === "both") && rentDeposit ? parseFloat(rentDeposit) : null,
