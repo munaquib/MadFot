@@ -387,7 +387,7 @@ const Index = () => {
               ))}
             </div>
             <div className="border-t border-border/30 pt-4 grid grid-cols-3 items-start">
-              <div className="text-center">
+              <div className="text-left justify-self-start">
                 <p className="text-lg font-extrabold text-secondary">
                   <span className="relative inline-block">
                     Verified
@@ -402,7 +402,7 @@ const Index = () => {
                 <p className="text-lg font-extrabold text-secondary">100%</p>
                 <p className="text-[10px] text-muted-foreground">Authentic</p>
               </div>
-              <div className="text-center">
+              <div className="text-center justify-self-end">
                 <p className="text-lg font-extrabold text-secondary">{avgRating !== "—" ? avgRating : "5.0★"}</p>
                 <p className="text-[10px] text-muted-foreground">User Rating</p>
               </div>
