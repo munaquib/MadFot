@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Heart, ShieldCheck, RotateCcw, Lock, X, SlidersHorizontal } from "lucide-react";
+import { MapPin, Heart, ShieldCheck, RotateCcw, Lock, X, SlidersHorizontal, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
@@ -38,7 +38,6 @@ const Index = () => {
   const [selectedCondition, setSelectedCondition] = useState("All");
   const [maxPrice, setMaxPrice] = useState(100000);
 
-  const [totalProducts, setTotalProducts] = useState(0);
   const [avgRating, setAvgRating] = useState("—");
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
@@ -113,12 +112,6 @@ const Index = () => {
     } else {
       setVerifiedSellerIds(new Set());
     }
-
-    const { count } = await supabase
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active");
-    setTotalProducts(count || 0);
 
     const { data: ratings } = await supabase
       .from("profiles")
@@ -395,15 +388,20 @@ const Index = () => {
             </div>
             <div className="border-t border-border/30 pt-3 flex items-center justify-between">
               <div className="text-center">
-                <p className="text-lg font-extrabold text-secondary">{totalProducts > 0 ? `${totalProducts}+` : "500+"}</p>
-                <p className="text-[10px] text-muted-foreground">Products Listed</p>
+                <p className="text-lg font-extrabold text-secondary flex items-center justify-center gap-1.5">
+                  Verified
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border-2 border-green-600">
+                    <Check className="w-2.5 h-2.5 text-green-600" strokeWidth={4} />
+                  </span>
+                </p>
+                <p className="text-[10px] text-muted-foreground">Sellers Near You</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-extrabold text-secondary">100%</p>
                 <p className="text-[10px] text-muted-foreground">Authentic</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-extrabold text-secondary">{avgRating !== "—" ? avgRating : "4.8★"}</p>
+                <p className="text-lg font-extrabold text-secondary">{avgRating !== "—" ? avgRating : "5.0★"}</p>
                 <p className="text-[10px] text-muted-foreground">User Rating</p>
               </div>
             </div>
