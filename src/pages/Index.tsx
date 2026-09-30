@@ -388,10 +388,12 @@ const Index = () => {
             </div>
             <div className="border-t border-border/30 pt-3 flex items-center justify-between">
               <div className="text-center">
-                <p className="text-lg font-extrabold text-secondary flex items-center justify-center gap-1.5">
-                  Verified
-                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border-2 border-green-600">
-                    <Check className="w-2.5 h-2.5 text-green-600" strokeWidth={4} />
+                <p className="text-lg font-extrabold text-secondary">
+                  <span className="relative inline-block">
+                    Verified
+                    <span className="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full border-2 border-green-600">
+                      <Check className="w-2.5 h-2.5 text-green-600" strokeWidth={4} />
+                    </span>
                   </span>
                 </p>
                 <p className="text-[10px] text-muted-foreground">Sellers Near You</p>
