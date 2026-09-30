@@ -162,7 +162,7 @@ const ProductDetail = () => {
               if (viewErr) console.error("View count update failed:", viewErr);
             });
 
-          supabase.from("ads").select("id").eq("product_id", id).eq("status", "active").maybeSingle().then(({ data: activeAd }) => {
+          supabase.from("ads").select("id").eq("product_id", id).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle().then(({ data: activeAd }) => {
             if (activeAd?.id) {
               supabase.from("ad_analytics").insert({ ad_id: activeAd.id, event_type: "view", user_id: user?.id || null }).then();
             }
@@ -227,6 +227,8 @@ const ProductDetail = () => {
         .select("id")
         .eq("product_id", id)
         .eq("status", "active")
+        // Expired ad ke click count nahi hone chahiye
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .maybeSingle();
       if (activeAd?.id) {
         await supabase.from("ad_analytics").insert({

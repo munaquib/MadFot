@@ -114,50 +114,55 @@ const MyAds = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {ads.map((ad, i) => (
-              <motion.div key={ad.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
-              >
-                <div className="flex gap-3">
-                  {ad.image_url && <img src={ad.image_url} alt={ad.ad_title} className="w-16 h-16 rounded-xl object-cover shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{ad.ad_title}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        ad.status === "active" ? "bg-primary/10 text-primary" :
-                        ad.status === "pending" ? "bg-secondary/10 text-secondary" :
-                        ad.status === "rejected" ? "bg-destructive/10 text-destructive" :
-                        "bg-muted text-muted-foreground"
-                      }`}>{ad.status}</span>
-                      <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{ad.placement}</span>
+            {ads.map((ad, i) => {
+              // End date nikal chuki ho to badge "expired" dikhao (status database mein active hi rehta hai)
+              const isExpired = !!ad.expires_at && new Date(ad.expires_at) <= new Date();
+              const shownStatus = ad.status === "active" && isExpired ? "expired" : ad.status;
+              return (
+                <motion.div key={ad.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                >
+                  <div className="flex gap-3">
+                    {ad.image_url && <img src={ad.image_url} alt={ad.ad_title} className="w-16 h-16 rounded-xl object-cover shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{ad.ad_title}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          shownStatus === "active" ? "bg-primary/10 text-primary" :
+                          shownStatus === "pending" ? "bg-secondary/10 text-secondary" :
+                          shownStatus === "rejected" ? "bg-destructive/10 text-destructive" :
+                          "bg-muted text-muted-foreground"
+                        }`}>{shownStatus}</span>
+                        <span className="text-[9px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{ad.placement}</span>
+                      </div>
+                      <p className="text-xs font-bold text-secondary mt-1">₹{ad.budget}</p>
                     </div>
-                    <p className="text-xs font-bold text-secondary mt-1">₹{ad.budget}</p>
                   </div>
-                </div>
 
-                {/* Analytics */}
-                <div className="grid grid-cols-3 gap-2 mt-3 bg-muted/30 rounded-xl p-2">
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-foreground">{ad.views}</p>
-                    <p className="text-[9px] text-muted-foreground">Views</p>
+                  {/* Analytics */}
+                  <div className="grid grid-cols-3 gap-2 mt-3 bg-muted/30 rounded-xl p-2">
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-foreground">{ad.views}</p>
+                      <p className="text-[9px] text-muted-foreground">Views</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-foreground">{ad.clicks}</p>
+                      <p className="text-[9px] text-muted-foreground">Clicks</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-foreground">{ad.ctr}%</p>
+                      <p className="text-[9px] text-muted-foreground">CTR</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-foreground">{ad.clicks}</p>
-                    <p className="text-[9px] text-muted-foreground">Clicks</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-foreground">{ad.ctr}%</p>
-                    <p className="text-[9px] text-muted-foreground">CTR</p>
-                  </div>
-                </div>
 
-                {ad.expires_at && (
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    {new Date(ad.expires_at) > new Date() ? `Expires: ${new Date(ad.expires_at).toLocaleDateString()}` : "Expired"}
-                  </p>
-                )}
-              </motion.div>
-            ))}
+                  {ad.expires_at && (
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      {!isExpired ? `Expires: ${new Date(ad.expires_at).toLocaleDateString()}` : "Expired"}
+                    </p>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

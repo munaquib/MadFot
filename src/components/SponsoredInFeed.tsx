@@ -30,6 +30,8 @@ const SponsoredInFeed = () => {
         .select("id, ad_title, description, image_url, product_id, products(title, price, location, condition, images)")
         .eq("status", "active")
         .eq("placement", "in-feed")
+        // Sirf wo ads jinki end date abhi nikli nahi (ya jinki end date set hi nahi hai)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order("budget", { ascending: false })
         .limit(4);
       setAds((data as any) || []);

@@ -25,6 +25,8 @@ const SponsoredCarousel = () => {
         .select("id, ad_title, description, image_url, product_id, budget")
         .eq("status", "active")
         .eq("placement", "top-banner")
+        // Sirf wo ads jinki end date abhi nikli nahi (ya jinki end date set hi nahi hai)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order("budget", { ascending: false })
         .limit(10);
       setAds(data || []);
