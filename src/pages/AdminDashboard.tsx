@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
+import AdminProductModal from "@/components/AdminProductModal";
 import { toast } from "sonner";
 
 interface Ad {
@@ -115,6 +116,7 @@ const AdminDashboard = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState<{ checked: number; mismatches: number; results: any[] } | null>(null);
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -345,12 +347,14 @@ const AdminDashboard = () => {
     fetchCoupons();
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (!window.confirm("Delete this listing?")) return;
+  // true return karta hai jab listing sach mein delete ho gayi (popup ko band karne ke liye)
+  const handleDeleteProduct = async (productId: string): Promise<boolean> => {
+    if (!window.confirm("Delete this listing?")) return false;
     const { error } = await supabase.from("products").delete().eq("id", productId);
-    if (error) { toast.error("Failed to delete (order history may be linked)"); return; }
+    if (error) { toast.error("Failed to delete (order history may be linked)"); return false; }
     toast.success("Listing deleted");
     fetchProducts();
+    return true;
   };
 
   const downloadCSV = (filename: string, rows: Record<string, any>[]) => {
@@ -1062,7 +1066,8 @@ const AdminDashboard = () => {
             ) : (
               products.map((p, i) => (
                 <motion.div key={p.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
-                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30"
+                  onClick={() => setSelectedProductId(p.id)}
+                  className="glass-card rounded-2xl p-3 shadow-card border border-border/30 cursor-pointer hover:shadow-luxury hover:border-secondary/40 transition-all"
                 >
                   <div className="flex gap-3">
                     {p.images && p.images[0] && <img src={p.images[0]} alt={p.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />}
@@ -1077,7 +1082,10 @@ const AdminDashboard = () => {
                       <p className="text-xs font-bold text-secondary mt-1">₹{p.price}</p>
                     </div>
                   </div>
-                  <button onClick={() => handleDeleteProduct(p.id)} className="mt-2 w-full py-1.5 text-destructive text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-destructive/5 rounded-lg transition-all">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteProduct(p.id); }}
+                    className="mt-2 w-full py-1.5 text-destructive text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-destructive/5 rounded-lg transition-all"
+                  >
                     <Trash2 className="w-3 h-3" /> Remove Listing
                   </button>
                 </motion.div>
@@ -1285,6 +1293,18 @@ const AdminDashboard = () => {
           </>
         )}
       </div>
+
+      {/* Product detail popup (Products tab ke card pe click karne par khulta hai) */}
+      {selectedProductId && (
+        <AdminProductModal
+          productId={selectedProductId}
+          onClose={() => setSelectedProductId(null)}
+          onRemove={async (id) => {
+            const deleted = await handleDeleteProduct(id);
+            if (deleted) setSelectedProductId(null);
+          }}
+        />
+      )}
     </AppLayout>
   );
 };
