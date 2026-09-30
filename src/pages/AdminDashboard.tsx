@@ -110,6 +110,7 @@ const AdminDashboard = () => {
   const [ads, setAds] = useState<Ad[]>([]);
   const [tab, setTab] = useState<"pending" | "active" | "expired" | "all" | "sellers" | "reports" | "orders" | "products" | "returns" | "buyers" | "broadcast" | "support" | "coupons" | "analytics">("pending");
   const [stats, setStats] = useState({ totalRevenue: 0, activeAds: 0, totalViews: 0, totalClicks: 0 });
+  const [productsListedCount, setProductsListedCount] = useState(0);
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -199,6 +200,14 @@ const AdminDashboard = () => {
     const { count: views } = await supabase.from("ad_analytics").select("id", { count: "exact", head: true }).eq("event_type", "view");
     const { count: clicks } = await supabase.from("ad_analytics").select("id", { count: "exact", head: true }).eq("event_type", "click");
     setStats({ totalRevenue, activeAds, totalViews: views || 0, totalClicks: clicks || 0 });
+
+    // Homepage ka "Products Listed" number yahin se aana chahiye — sirf currently
+    // visible (active) listings ginta hai, taaki dono jagah ka number match kare.
+    const { count: productsCount } = await supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "inactive");
+    setProductsListedCount(productsCount || 0);
   };
 
   const fetchSellers = async () => {
@@ -604,8 +613,9 @@ const AdminDashboard = () => {
           <button onClick={() => navigate(-1)}><ArrowLeft className="w-5 h-5 text-secondary" /></button>
           <h1 className="text-secondary font-bold text-lg font-serif flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Admin Dashboard</h1>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {[
+            { icon: ShoppingBag, label: "Products Listed", value: productsListedCount.toLocaleString() },
             { icon: IndianRupee, label: "Revenue", value: `₹${stats.totalRevenue.toLocaleString()}` },
             { icon: Megaphone, label: "Active Ads", value: stats.activeAds },
             { icon: Eye, label: "Total Views", value: stats.totalViews.toLocaleString() },
