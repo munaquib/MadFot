@@ -69,7 +69,7 @@ serve(async (req) => {
 
     let pickupPin = "";
     let parcel = DEFAULT_PARCEL;
-    const debug = body.debug === true;
+    const debug = false; // debug mode band kar diya (koi bhi Shiprocket ka raw data nahi nikal sakta)
 
     if (debug && /^\d{6}$/.test(String(body.pickup_pincode || ""))) {
       // Sirf testing ke liye: product ke bina seedha pincodes se rate dekho

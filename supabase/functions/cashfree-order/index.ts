@@ -103,14 +103,34 @@ serve(async (req) => {
   }
 
   try {
+    // Login check: buyer kaun hai ye login token se pata chalta hai (body ke buyer_id pe bharosa nahi)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Please login to continue" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    const authClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: authUser }, error: authErr } = await authClient.auth.getUser();
+    if (authErr || !authUser) {
+      return new Response(JSON.stringify({ error: "Invalid session, please login again" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    const buyer_id = authUser.id;
+
     const {
-      product_id, buyer_id, buyer_email, buyer_name, buyer_phone,
+      product_id, buyer_email, buyer_name, buyer_phone,
       delivery_address, delivery_city, delivery_state, delivery_pincode,
       coupon_code, quoted_shipping,
     } = await req.json();
 
-    if (!product_id || !buyer_id) {
-      throw new Error("product_id and buyer_id are required");
+    if (!product_id) {
+      throw new Error("product_id is required");
     }
     if (!delivery_address || !delivery_city || !delivery_state || !delivery_pincode) {
       throw new Error("Complete delivery address is required");
@@ -122,6 +142,16 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Banned user checkout nahi kar sakta
+    const { data: buyerProfile } = await supabase
+      .from("profiles")
+      .select("is_banned")
+      .eq("user_id", buyer_id)
+      .maybeSingle();
+    if (buyerProfile?.is_banned) {
+      throw new Error("Your account is restricted. Please contact support.");
+    }
 
     // Price browser se nahi, database se padhte hain (taaki koi amount change na kar sake)
     const { data: product, error: productErr } = await supabase

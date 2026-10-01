@@ -22,6 +22,14 @@ const parcelFor = (category?: string | null) =>
 
 const last10Digits = (v: string | null | undefined) => (v || "").replace(/\D/g, "").slice(-10);
 
+// Constant-time string compare (signature guess karne se bachne ke liye)
+const safeEqual = (a: string, b: string) => {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+};
+
 async function srCall(path: string, token: string | null, method: string, body?: unknown) {
   const res = await fetch(`${SHIPROCKET_BASE}${path}`, {
     method,
@@ -246,7 +254,7 @@ serve(async (req) => {
     const sigBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(timestamp + rawBody));
     const expectedSignature = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
 
-    if (expectedSignature !== signature) {
+    if (!safeEqual(expectedSignature, signature)) {
       console.error("Webhook signature mismatch");
       return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401 });
     }
@@ -320,6 +328,25 @@ serve(async (req) => {
       return new Response(JSON.stringify({ received: true, note: "already processed" }), { status: 200 });
     }
 
+    // Cashfree ne jitna paisa liya wo humare bane hue amount se kam na ho
+    const paidAmount = Number(payload.data?.order?.order_amount);
+    if (Number.isFinite(paidAmount) && paidAmount + 0.001 < Number(pendingOrder.amount)) {
+      console.error("Order payment amount mismatch", cfOrderId, paidAmount, pendingOrder.amount);
+      return new Response(JSON.stringify({ received: true }), { status: 200 });
+    }
+
+    // Duplicate webhook (retry) se do order na bane: pehle "completed" claim karo.
+    // Sirf ek hi request ko ye claim milega, baaki ko khali result milega.
+    const { data: claimed } = await supabase
+      .from("payment_orders")
+      .update({ status: "completed" })
+      .eq("cf_order_id", cfOrderId)
+      .eq("status", "pending")
+      .select("id");
+    if (!claimed || claimed.length === 0) {
+      return new Response(JSON.stringify({ received: true, note: "already processed" }), { status: 200 });
+    }
+
     // payment_orders.amount = product price - coupon discount + shipping. Seller ka hisaab sirf (product price - discount) pe.
     const shippingCharge = Number(pendingOrder.shipping_charge || 0);
     const itemAmount = Math.round((Number(pendingOrder.amount) - shippingCharge) * 100) / 100;
@@ -353,6 +380,8 @@ serve(async (req) => {
 
     if (orderErr) {
       console.error("orders insert failed:", orderErr);
+      // Claim wapas hata do taaki Cashfree ka retry dobara try kar sake
+      await supabase.from("payment_orders").update({ status: "pending" }).eq("cf_order_id", cfOrderId);
       return new Response(JSON.stringify({ error: "Failed to create order" }), { status: 500 });
     }
 
