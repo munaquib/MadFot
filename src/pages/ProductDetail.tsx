@@ -22,6 +22,12 @@ declare global {
 // Agar quote service kabhi kaam na kare to server (cashfree-order) mein bhi yahi flat charge lagta hai.
 const FALLBACK_SHIPPING_CHARGE = 100;
 
+// Edge functions ko user ka asli login token chahiye (anon key nahi)
+const getAuthToken = async () => {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+};
+
 const ProductDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -164,7 +170,7 @@ const ProductDetail = () => {
 
           supabase.from("ads").select("id").eq("product_id", id).eq("status", "active").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle().then(({ data: activeAd }) => {
             if (activeAd?.id) {
-              supabase.from("ad_analytics").insert({ ad_id: activeAd.id, event_type: "view", user_id: user?.id || null }).then();
+              supabase.from("ad_analytics").insert({ ad_id: activeAd.id, event_type: "view" }).then();
             }
           });
 
@@ -234,7 +240,7 @@ const ProductDetail = () => {
         await supabase.from("ad_analytics").insert({
           ad_id: activeAd.id,
           event_type: "click",
-          user_id: user?.id || null,
+          
         });
       }
     } catch (e) {
@@ -267,7 +273,7 @@ const ProductDetail = () => {
         headers: {
           "Content-Type": "application/json",
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          "Authorization": `Bearer ${await getAuthToken()}`
         },
         body: JSON.stringify({ product_id: product.id, delivery_pincode: gateAddress.pincode }),
       });
@@ -369,7 +375,7 @@ const ProductDetail = () => {
         headers: {
           "Content-Type": "application/json",
           "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          "Authorization": `Bearer ${await getAuthToken()}`
         },
         body: JSON.stringify({
           product_id: product.id,
