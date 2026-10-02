@@ -571,7 +571,7 @@ const ProductDetail = () => {
         seller_id: product.user_id,
         product_id: product.id,
         product_title: product.title,
-        price: product.rent_price_per_day * rentDays,
+        amount: product.rent_price_per_day * rentDays,
         order_type: "rental",
         rental_start_date: rentStartDate,
         rental_end_date: rentEndDate,
