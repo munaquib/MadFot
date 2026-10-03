@@ -250,11 +250,11 @@ const OrderDetail = () => {
               <div className="py-6 text-center text-xs text-muted-foreground">Fetching latest updates…</div>
             ) : trackError && trackActivities.length === 0 ? (
               <div className="py-4 text-center">
-                <p className="text-xs text-muted-foreground">Tracking abhi available nahi hai. Thodi der baad try karo.</p>
+                <p className="text-xs text-muted-foreground">Tracking is not available right now. Please try again in a while.</p>
               </div>
             ) : trackActivities.length === 0 ? (
               <div className="py-4 text-center">
-                <p className="text-xs text-muted-foreground">Courier ne abhi tak koi update nahi bheja hai. Pickup hote hi yahan dikhega.</p>
+                <p className="text-xs text-muted-foreground">The courier has not shared any update yet. It will appear here once the parcel is picked up.</p>
               </div>
             ) : (
               <div className="space-y-0">
@@ -284,7 +284,7 @@ const OrderDetail = () => {
           </motion.div>
         )}
 
-        {/* Seller actions — Mark as Shipped/Delivered (order ko age badhane ke liye) */}
+        {/* Seller actions — sirf Mark as Shipped. Delivered courier tracking se aata hai, seller khud mark nahi kar sakta */}
         {isSeller && (order.status === "processing" || order.status === "shipped") && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-3">
             {order.status === "processing" && (
@@ -294,10 +294,9 @@ const OrderDetail = () => {
               </button>
             )}
             {order.status === "shipped" && (
-              <button onClick={() => updateStatus("delivered")} disabled={updating}
-                className="flex-1 py-3 bg-primary text-secondary rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all flex items-center justify-center gap-2">
-                <CheckCircle className="w-4 h-4" /> Mark as Delivered
-              </button>
+              <p className="flex-1 text-[11px] text-muted-foreground text-center py-2">
+                Delivery will be confirmed automatically from courier tracking.
+              </p>
             )}
           </motion.div>
         )}
@@ -312,7 +311,7 @@ const OrderDetail = () => {
               className="w-full py-3 border border-border text-foreground rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-muted transition-all flex items-center justify-center gap-2">
               <Package className="w-4 h-4" /> {updating ? "Updating..." : "Allow Buyer to Purchase Again"}
             </button>
-            <p className="text-[10px] text-muted-foreground text-center mt-1.5">Isse ye product is buyer ke liye phir se "Buy Now" ban jayega — item wapas aana zaroori nahi.</p>
+            <p className="text-[10px] text-muted-foreground text-center mt-1.5">This will make the product available for this buyer to purchase again. The item does not need to be returned.</p>
           </motion.div>
         )}
 
