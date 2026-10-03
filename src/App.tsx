@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { useEffect } from "react";
 import { requestPushPermission, setupMessageNotifications } from "@/lib/notifications";
+import PickupAddressGate from "@/components/PickupAddressGate";
 import Index from "./pages/Index";
 import ProductDetail from "./pages/ProductDetail";
 import Chat from "./pages/Chat";
@@ -66,6 +67,7 @@ const App = () => (
           <BrowserRouter>
             <AuthProvider>
               <NotificationSetup />
+              <PickupAddressGate />
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />

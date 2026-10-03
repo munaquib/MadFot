@@ -6,6 +6,23 @@ import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
 import { toast } from "sonner";
 
+const STATES = [
+  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
+  "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka",
+  "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+  "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim",
+  "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+];
+
+const cleanPhone = (v: string) => {
+  const digits = v.replace(/\D/g, "");
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
+const inputCls =
+  "w-full bg-card border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50";
+
 const EditProfile = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -17,6 +34,14 @@ const EditProfile = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // Pickup address (used by the courier to collect sold items)
+  const [pickupName, setPickupName] = useState("");
+  const [pickupPhone, setPickupPhone] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupCity, setPickupCity] = useState("");
+  const [pickupState, setPickupState] = useState("");
+  const [pickupPincode, setPickupPincode] = useState("");
+
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("*").eq("user_id", user.id).single().then(({ data }) => {
@@ -25,6 +50,13 @@ const EditProfile = () => {
         setPhone(data.phone || "");
         setLocation(data.location || "");
         setAvatarUrl(data.avatar_url || null);
+        const d = data as any;
+        setPickupName(d.pickup_name || "");
+        setPickupPhone(d.pickup_phone || "");
+        setPickupAddress(d.pickup_address || "");
+        setPickupCity(d.pickup_city || "");
+        setPickupState(d.pickup_state || "");
+        setPickupPincode(d.pickup_pincode || "");
       }
     });
   }, [user]);
@@ -75,14 +107,48 @@ const EditProfile = () => {
 
   const handleSave = async () => {
     if (!user) return;
+
+    // Pickup address is optional for buyers. If any pickup field is filled,
+    // all of them must be valid so the courier gets a complete address.
+    const pName = pickupName.trim();
+    const pPhone = cleanPhone(pickupPhone);
+    const pAddress = pickupAddress.trim();
+    const pCity = pickupCity.trim();
+    const pState = pickupState.trim();
+    const pPincode = pickupPincode.trim();
+    const anyPickup = !!(pName || pickupPhone.trim() || pAddress || pCity || pState || pPincode);
+
+    if (anyPickup) {
+      if (pName.length < 2) return toast.error("Pickup address: enter the full name");
+      if (!/^[6-9]\d{9}$/.test(pPhone)) return toast.error("Pickup address: enter a valid 10-digit mobile number");
+      if (pAddress.length < 10) return toast.error("Pickup address: enter the complete address (house no, street, area)");
+      if (pCity.length < 2) return toast.error("Pickup address: enter the city");
+      if (!pState) return toast.error("Pickup address: select the state");
+      if (!/^\d{6}$/.test(pPincode)) return toast.error("Pickup address: enter a valid 6-digit pincode");
+    }
+
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({
+    const updates: Record<string, string> = {
       full_name: fullName,
       phone,
       location,
-    }).eq("user_id", user.id);
+    };
+    if (anyPickup) {
+      updates.pickup_name = pName;
+      updates.pickup_phone = pPhone;
+      updates.pickup_address = pAddress;
+      updates.pickup_city = pCity;
+      updates.pickup_state = pState;
+      updates.pickup_pincode = pPincode;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("user_id", user.id)
+      .select("user_id");
     setSaving(false);
-    if (error) {
+    if (error || !data || data.length === 0) {
       toast.error("Failed to update profile");
     } else {
       toast.success("Profile updated successfully!");
@@ -91,6 +157,7 @@ const EditProfile = () => {
   };
 
   const initials = fullName ? fullName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "U";
+  const stateOptions = pickupState && !STATES.includes(pickupState) ? [pickupState, ...STATES] : STATES;
 
   return (
     <AppLayout>
@@ -126,19 +193,59 @@ const EditProfile = () => {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Full Name</label>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-card border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" placeholder="Enter your full name" />
+              <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputCls} placeholder="Enter your full name" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Phone Number</label>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-card border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" placeholder="+91 XXXXX XXXXX" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+91 XXXXX XXXXX" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Location</label>
-              <input value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-card border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/50" placeholder="City, State" />
+              <input value={location} onChange={(e) => setLocation(e.target.value)} className={inputCls} placeholder="City, State" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Email</label>
               <input value={user?.email || ""} disabled className="w-full bg-muted/50 border border-border/30 rounded-xl px-4 py-3 text-sm text-muted-foreground cursor-not-allowed" />
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-2 border-t border-border/40">
+            <div>
+              <h2 className="text-base font-bold text-foreground font-serif mt-4">Pickup Address</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sellers: the courier collects your sold items from this address. Leave it empty if you only buy.
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Name</label>
+              <input value={pickupName} onChange={(e) => setPickupName(e.target.value)} className={inputCls} placeholder="Name of the person handing over the parcel" autoComplete="name" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Mobile Number</label>
+              <input value={pickupPhone} onChange={(e) => setPickupPhone(e.target.value)} className={inputCls} placeholder="10-digit mobile number" inputMode="numeric" maxLength={14} autoComplete="tel" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Complete Address</label>
+              <input value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} className={inputCls} placeholder="House no, street, area, landmark" autoComplete="street-address" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">City</label>
+                <input value={pickupCity} onChange={(e) => setPickupCity(e.target.value)} className={inputCls} placeholder="City" autoComplete="address-level2" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">Pincode</label>
+                <input value={pickupPincode} onChange={(e) => setPickupPincode(e.target.value)} className={inputCls} placeholder="6 digits" inputMode="numeric" maxLength={6} autoComplete="postal-code" />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">State</label>
+              <select value={pickupState} onChange={(e) => setPickupState(e.target.value)} className={inputCls}>
+                <option value="">Select state</option>
+                {stateOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           </div>
 
