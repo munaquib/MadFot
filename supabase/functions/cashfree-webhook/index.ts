@@ -22,6 +22,20 @@ const parcelFor = (category?: string | null) =>
 
 const last10Digits = (v: string | null | undefined) => (v || "").replace(/\D/g, "").slice(-10);
 
+// Payment ke baad confirm karte waqt dobara check: kisi aur ne in dates mein pehle booking to nahi kar li
+async function hasConfirmedRentalOverlap(supabase: any, productId: string, start: string, end: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("orders")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("order_type", "rental")
+    .not("status", "in", "(cancelled,returned)")
+    .lte("rental_start_date", end)
+    .gte("rental_end_date", start)
+    .limit(1);
+  return !!(data && data.length > 0);
+}
+
 // Constant-time string compare (signature guess karne se bachne ke liye)
 const safeEqual = (a: string, b: string) => {
   if (a.length !== b.length) return false;
@@ -348,8 +362,15 @@ serve(async (req) => {
     }
 
     // payment_orders.amount = product price - coupon discount + shipping. Seller ka hisaab sirf (product price - discount) pe.
+    const isRental = pendingOrder.order_type === "rental";
     const shippingCharge = Number(pendingOrder.shipping_charge || 0);
-    const itemAmount = Math.round((Number(pendingOrder.amount) - shippingCharge) * 100) / 100;
+    // Rental: deposit seller ki kamai nahi hai, alag rakha jata hai (commission aur payout sirf rent par)
+    const depositAmount = isRental ? Number(pendingOrder.deposit_amount || 0) : 0;
+    const itemAmount = Math.round((Number(pendingOrder.amount) - shippingCharge - depositAmount) * 100) / 100;
+    // Payment hone tak kisi aur ne dates book kar li hon to ye order "cancelled" banega taaki admin refund kar sake
+    const rentalConflict = isRental
+      ? await hasConfirmedRentalOverlap(supabase, pendingOrder.product_id, String(pendingOrder.rental_start_date), String(pendingOrder.rental_end_date))
+      : false;
     const commission = Math.round(itemAmount * COMMISSION_RATE * 100) / 100;
     const sellerPayout = Math.round((itemAmount - commission) * 100) / 100;
 
@@ -362,12 +383,20 @@ serve(async (req) => {
         product_title: pendingOrder.product_title,
         amount: itemAmount,
         shipping_charge: shippingCharge,
-        status: "processing",
+        status: rentalConflict ? "cancelled" : "processing",
         razorpay_order_id: cfOrderId,
-        order_type: "buy",
+        order_type: isRental ? "rental" : "buy",
         platform_commission: commission,
         seller_payout_amount: sellerPayout,
-        payout_status: "pending",
+        payout_status: rentalConflict ? null : "pending",
+        ...(isRental
+          ? {
+              deposit_amount: depositAmount,
+              rental_start_date: pendingOrder.rental_start_date,
+              rental_end_date: pendingOrder.rental_end_date,
+              rental_days: pendingOrder.rental_days,
+            }
+          : {}),
         buyer_name: pendingOrder.buyer_name || null,
         buyer_phone: pendingOrder.buyer_phone || null,
         delivery_address: pendingOrder.delivery_address || null,
@@ -385,6 +414,18 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to create order" }), { status: 500 });
     }
 
+    if (rentalConflict) {
+      await supabase.from("notifications").insert({
+        user_id: pendingOrder.buyer_id,
+        title: "Rental dates no longer available",
+        message: `Sorry, the dates you selected for ${pendingOrder.product_title} were booked by someone else just before your payment completed. Your full payment will be refunded by our team.`,
+        type: "order",
+        is_read: false,
+        related_order_id: newOrder?.id || null,
+      });
+      return new Response(JSON.stringify({ received: true, note: "rental conflict, needs refund" }), { status: 200 });
+    }
+
     // Product ki pehli image nikalo, taaki notification mein dikhe
     let productImageUrl: string | null = null;
     const { data: productRow } = await supabase
@@ -398,8 +439,10 @@ serve(async (req) => {
 
     await supabase.from("notifications").insert({
       user_id: pendingOrder.seller_id,
-      title: "New Order! 🎉",
-      message: `You've received an order for ${pendingOrder.product_title}. Pack the parcel and keep it ready — the courier will arrive soon for pickup.`,
+      title: isRental ? "New Rental Order! 🎉" : "New Order! 🎉",
+      message: isRental
+        ? `You've received a rental order for ${pendingOrder.product_title} (${pendingOrder.rental_start_date} to ${pendingOrder.rental_end_date}). Pack the outfit and keep it ready — the courier will arrive soon for pickup.`
+        : `You've received an order for ${pendingOrder.product_title}. Pack the parcel and keep it ready — the courier will arrive soon for pickup.`,
       type: "order",
       is_read: false,
       related_order_id: newOrder?.id || null,
@@ -427,7 +470,12 @@ serve(async (req) => {
     }
 
     // Shiprocket ka kaam background mein (webhook turant 200 de deta hai)
-    const shipmentTask = createShipment(supabase, newOrder, pendingOrder, cfOrderId);
+    const shipmentTask = createShipment(
+      supabase,
+      isRental ? { ...newOrder, amount: itemAmount + depositAmount } : newOrder,
+      pendingOrder,
+      cfOrderId
+    );
     const runtime = (globalThis as any).EdgeRuntime;
     if (runtime?.waitUntil) {
       runtime.waitUntil(shipmentTask);

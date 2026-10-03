@@ -9,6 +9,39 @@ const corsHeaders = {
 // Shiprocket se rate na mil paye (service down ho) to ye flat charge lagega, taaki checkout na ruke
 const FALLBACK_SHIPPING_CHARGE = 100;
 
+// Rental dates overlap check: confirmed rentals + abhi payment-in-progress (pichle 30 min) dono dekhta hai.
+// End date bhi "occupied" maani jaati hai (saman wapas aane aur ready hone ka buffer).
+async function hasRentalOverlap(supabase: any, productId: string, start: string, end: string): Promise<boolean> {
+  const { data: confirmed } = await supabase
+    .from("orders")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("order_type", "rental")
+    .not("status", "in", "(cancelled,returned)")
+    .lte("rental_start_date", end)
+    .gte("rental_end_date", start)
+    .limit(1);
+  if (confirmed && confirmed.length > 0) return true;
+  const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: inProgress } = await supabase
+    .from("payment_orders")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("order_type", "rental")
+    .eq("status", "pending")
+    .gte("created_at", since)
+    .lte("rental_start_date", end)
+    .gte("rental_end_date", start)
+    .limit(1);
+  return !!(inProgress && inProgress.length > 0);
+}
+
+const dayNumber = (d: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || ""));
+  if (!m) return NaN;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000;
+};
+
 const SHIPROCKET_BASE = "https://apiv2.shiprocket.in/v1/external";
 // Shiprocket rate upar ke itne rupaye tak round karke buyer se liya jaata hai
 const ROUND_UP_TO = 5;
@@ -127,7 +160,9 @@ serve(async (req) => {
       product_id, buyer_email, buyer_name, buyer_phone,
       delivery_address, delivery_city, delivery_state, delivery_pincode,
       coupon_code, quoted_shipping,
+      order_type, rental_start_date, rental_end_date,
     } = await req.json();
+    const isRental = order_type === "rental";
 
     if (!product_id) {
       throw new Error("product_id is required");
@@ -156,7 +191,7 @@ serve(async (req) => {
     // Price browser se nahi, database se padhte hain (taaki koi amount change na kar sake)
     const { data: product, error: productErr } = await supabase
       .from("products")
-      .select("id, title, price, user_id, status, category")
+      .select("id, title, price, user_id, status, category, listing_type, rent_price_per_day, rent_deposit, min_rent_days, max_rent_days")
       .eq("id", product_id)
       .single();
 
@@ -168,6 +203,32 @@ serve(async (req) => {
     }
     if (product.user_id === buyer_id) {
       throw new Error("Aap apna hi product nahi khareed sakte");
+    }
+
+    // ---- Rental: rent, deposit, days sab server par database se tay hote hain ----
+    let rentAmount = 0;
+    let depositAmount = 0;
+    let rentalDays = 0;
+    if (isRental) {
+      if (!["rent", "both"].includes(String(product.listing_type))) {
+        throw new Error("Ye product rent ke liye available nahi hai");
+      }
+      const perDay = Number(product.rent_price_per_day);
+      if (!Number.isFinite(perDay) || perDay <= 0) throw new Error("Rent price set nahi hai");
+      const startN = dayNumber(rental_start_date);
+      const endN = dayNumber(rental_end_date);
+      if (!Number.isFinite(startN) || !Number.isFinite(endN)) throw new Error("Please select valid rental dates");
+      const todayN = Math.floor(Date.now() / 86400000) - 1; // 1 din ki chhoot (India ka time zone)
+      if (startN < todayN) throw new Error("Rental start date past mein nahi ho sakti");
+      rentalDays = endN - startN;
+      if (rentalDays < 1) throw new Error("Please select valid rental dates");
+      if (rentalDays < Number(product.min_rent_days || 1)) throw new Error(`Minimum ${product.min_rent_days || 1} days required`);
+      if (rentalDays > Number(product.max_rent_days || 30)) throw new Error(`Maximum ${product.max_rent_days || 30} days allowed`);
+      if (await hasRentalOverlap(supabase, product_id, String(rental_start_date), String(rental_end_date))) {
+        throw new Error("Ye dates already booked hain. Please koi aur dates chuno.");
+      }
+      rentAmount = Math.round(perDay * rentalDays * 100) / 100;
+      depositAmount = Math.round(Number(product.rent_deposit || 0) * 100) / 100;
     }
 
     // Delivery charge bhi browser se nahi, server par Shiprocket se nikalte hain
@@ -198,12 +259,12 @@ serve(async (req) => {
       throw new Error(`The delivery charge changed to ₹${shippingCharge}. Please review your order and try again.`);
     }
 
-    const itemPrice = Number(product.price);
+    const itemPrice = isRental ? rentAmount + depositAmount : Number(product.price);
     let discountAmount = 0;
     let appliedCouponCode: string | null = null;
 
     // Coupon validation — sab kuch server-side, taaki koi client se discount tamper na kar sake.
-    if (coupon_code && typeof coupon_code === "string" && coupon_code.trim()) {
+    if (!isRental && coupon_code && typeof coupon_code === "string" && coupon_code.trim()) {
       const code = coupon_code.trim().toUpperCase();
       const { data: coupon, error: couponErr } = await supabase
         .from("coupons")
@@ -257,7 +318,7 @@ serve(async (req) => {
       order_meta: {
         return_url: `https://madfod.com/payment-success?order_id=${orderId}`,
       },
-      order_note: product.title || "MadFod Purchase",
+      order_note: (isRental ? "Rental: " : "") + (product.title || "MadFod Purchase"),
     };
 
     const response = await fetch("https://api.cashfree.com/pg/orders", {
@@ -289,6 +350,12 @@ serve(async (req) => {
         shipping_charge: shippingCharge,
         coupon_code: appliedCouponCode,
         discount_amount: discountAmount,
+        order_type: isRental ? "rental" : "buy",
+        rental_start_date: isRental ? rental_start_date : null,
+        rental_end_date: isRental ? rental_end_date : null,
+        rental_days: isRental ? rentalDays : null,
+        rent_amount: isRental ? rentAmount : null,
+        deposit_amount: isRental ? depositAmount : null,
         product_title: product.title || "MadFod Purchase",
         status: "pending",
         buyer_name: buyer_name || null,

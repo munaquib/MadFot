@@ -297,11 +297,11 @@ const ProductDetail = () => {
 
   // Order summary khulte hi (ya address/pincode badalte hi) charge dobara nikalo
   useEffect(() => {
-    if (showOrderSummary && product?.id && gateAddress?.pincode) {
+    if ((showOrderSummary || showRentDialog) && product?.id && gateAddress?.pincode) {
       fetchQuote();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showOrderSummary, product?.id, gateAddress?.pincode]);
+  }, [showOrderSummary, showRentDialog, product?.id, gateAddress?.pincode]);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim() || !product) return;
@@ -566,30 +566,47 @@ const ProductDetail = () => {
     if (rentDays > (product?.max_rent_days || 30)) { toast.error(`Maximum ${product?.max_rent_days} days allowed`); return; }
 
     try {
-      const { error } = await supabase.from("orders").insert({
-        buyer_id: user.id,
-        seller_id: product.user_id,
-        product_id: product.id,
-        product_title: product.title,
-        amount: product.rent_price_per_day * rentDays,
-        order_type: "rental",
-        rental_start_date: rentStartDate,
-        rental_end_date: rentEndDate,
-        rental_days: rentDays,
-        deposit_amount: product.rent_deposit || 0,
-        status: "processing",
-        buyer_name: gateAddress.name || null,
-        buyer_phone: gateAddress.phone || null,
-        delivery_address: gateAddress.address || null,
-        delivery_city: gateAddress.city || null,
-        delivery_state: gateAddress.state || null,
-        delivery_pincode: gateAddress.pincode || null,
-      } as any);
-      if (error) throw error;
-      toast.success("Rental booked successfully! 🎉");
+      if (shipCharge === null) { toast.error("Delivery charge is still loading. Please wait a moment."); return; }
+      setPaying(true);
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${await getAuthToken()}`
+        },
+        body: JSON.stringify({
+          product_id: product.id,
+          order_type: "rental",
+          rental_start_date: rentStartDate,
+          rental_end_date: rentEndDate,
+          buyer_email: user.email || "customer@madfod.com",
+          buyer_name: gateAddress.name,
+          buyer_phone: gateAddress.phone,
+          delivery_address: gateAddress.address,
+          delivery_city: gateAddress.city,
+          delivery_state: gateAddress.state,
+          delivery_pincode: gateAddress.pincode,
+          quoted_shipping: shipCharge,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start rental payment");
       setShowRentDialog(false);
+      const cashfree = window.Cashfree({ mode: "production" });
+      cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_modal",
+      }).then((result: any) => {
+        if (result.error) { toast.error("Payment failed: " + result.error.message); }
+        else if (result.paymentDetails) { toast.success("Payment successful! 🎉 Your rental is confirmed."); }
+        else if (result.redirect) { toast.info("Redirecting to payment..."); }
+      });
+      setPaying(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to book rental");
+      setPaying(false);
+      toast.error(err.message || "Failed to start rental payment");
+      fetchQuote();
     }
   };
 
@@ -1149,11 +1166,15 @@ const ProductDetail = () => {
                     <span className="text-muted-foreground">Security Deposit</span>
                     <span className="font-semibold">₹{(product?.rent_deposit || 0).toLocaleString("en-IN")}</span>
                   </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Delivery</span>
+                    <span className="font-semibold">{quoteLoading ? "Calculating..." : shipCharge !== null ? `₹${shipCharge}` : "—"}</span>
+                  </div>
                   <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1 mt-1">
                     <span>Total</span>
-                    <span className="text-secondary">₹{rentTotal.toLocaleString("en-IN")}</span>
+                    <span className="text-secondary">{shipCharge !== null ? `₹${(rentTotal + shipCharge).toLocaleString("en-IN")}` : "—"}</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">💡 Deposit refunded after safe return</p>
+                  <p className="text-[10px] text-muted-foreground">💡 Deposit is refunded after the outfit is returned safely</p>
                 </div>
               )}
               <div className="flex gap-3">
@@ -1161,9 +1182,9 @@ const ProductDetail = () => {
                   className="flex-1 py-3 glass-card border border-border text-foreground rounded-xl font-semibold text-sm">
                   Cancel
                 </button>
-                <button onClick={handleRentNow} disabled={rentDays < 1}
+                <button onClick={handleRentNow} disabled={rentDays < 1 || paying || quoteLoading || shipCharge === null}
                   className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm disabled:opacity-50 hover:opacity-90 transition-all">
-                  🔄 Confirm Rental
+                  🔄 {paying ? "Processing..." : "Pay & Confirm Rental"}
                 </button>
               </div>
             </div>
